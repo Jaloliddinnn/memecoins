@@ -45,10 +45,9 @@ export async function getCurrentHolders(mintAddress: string): Promise<HolderTabl
   });
 
   const tags = await prisma.taggedWallet.findMany({
-    where: { walletAddress: { in: owners.map((o) => o.walletAddress) } },
-    include: { cluster: true },
+    where: { address: { in: owners.map((o) => o.walletAddress) } },
   });
-  const tagByWallet = new Map(tags.map((t) => [t.walletAddress, t]));
+  const tagByWallet = new Map(tags.map((t) => [t.address, t]));
 
   const holders: HolderRow[] = owners.map((o) => {
     const tag = tagByWallet.get(o.walletAddress);
@@ -57,10 +56,10 @@ export async function getCurrentHolders(mintAddress: string): Promise<HolderTabl
       balanceRaw: o.balanceRaw.toString(),
       percentOfSupply:
         totalSupplyRaw > 0n ? Number((o.balanceRaw * 10000n) / totalSupplyRaw) / 100 : 0,
-      tagType: (tag?.tagType as HolderRow['tagType']) ?? null,
-      customNote: tag?.customNote ?? null,
-      clusterId: tag?.clusterId ?? null,
-      clusterLabel: tag?.cluster?.label ?? null,
+      tagType: (tag?.tag as HolderRow['tagType']) ?? null,
+      note: tag?.notes ?? tag?.note ?? null,
+      clusterLabel: tag?.label ?? null,
+      clusterParent: tag?.clusterParent ?? null,
     };
   });
   holders.sort((a, b) => b.percentOfSupply - a.percentOfSupply);

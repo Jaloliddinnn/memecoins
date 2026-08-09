@@ -4,15 +4,15 @@ import { useState, useTransition } from 'react';
 import type { TagType } from '@/types';
 
 const TAG_STYLES: Record<TagType, string> = {
-  INSIDER: 'bg-insider/20 text-insider border-insider',
-  OUTSIDER: 'bg-outsider/20 text-outsider border-outsider',
-  MEV_BOT: 'bg-mevbot/20 text-mevbot border-mevbot',
+  insider: 'bg-insider/20 text-insider border-insider',
+  outsider: 'bg-outsider/20 text-outsider border-outsider',
+  mev_bot: 'bg-mevbot/20 text-mevbot border-mevbot',
 };
 
 const TAG_LABELS: Record<TagType, string> = {
-  INSIDER: 'Insider',
-  OUTSIDER: 'Outsider',
-  MEV_BOT: 'MEV/Bot',
+  insider: 'Insider',
+  outsider: 'Outsider',
+  mev_bot: 'MEV/Bot',
 };
 
 interface TagToggleProps {

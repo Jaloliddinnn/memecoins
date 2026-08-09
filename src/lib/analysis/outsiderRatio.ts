@@ -14,8 +14,8 @@ export function computeOutsiderVolume(
   holders: HolderRow[],
   totalPoolSol: number
 ): OutsiderVolumeResult {
-  const insiderPct = sumPercent(holders, 'INSIDER');
-  const mevBotPct = sumPercent(holders, 'MEV_BOT');
+  const insiderPct = sumPercent(holders, 'insider');
+  const mevBotPct = sumPercent(holders, 'mev_bot');
 
   const insiderTaggedSol = totalPoolSol * (insiderPct / 100);
   const mevBotTaggedSol = totalPoolSol * (mevBotPct / 100);

@@ -47,12 +47,6 @@ async function persistSnapshot(
   mintAddress: string,
   result: Awaited<ReturnType<typeof getCurrentHolders>>
 ) {
-  await prisma.token.upsert({
-    where: { mintAddress },
-    update: {},
-    create: { mintAddress },
-  });
-
   await prisma.holderSnapshot.createMany({
     data: result.holders.map((h) => ({
       mintAddress,

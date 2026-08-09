@@ -2,68 +2,67 @@ import { prisma } from '@/lib/prisma';
 import type { ClusterTrackRecord } from '@/types';
 
 /**
- * A launch counts as "pumped" once its peak post-migration market cap
- * clears this bar. Tune per your own read of what counts as a real run —
- * default assumes anything holding above 10x a typical ~40k bonding mcap
- * is a deliberate pump, not just curve-completion noise.
+ * A wallet cluster's historical pump-vs-dump-to-zero track record, using
+ * your curated `coin_stats.outcome` ground truth instead of a guessed
+ * market-cap threshold. This is the core signal for the actual question:
+ * "which of their same-day duplicate launches are they going to run up,
+ * and which will they just drain." A cluster that's run up 2 of its last
+ * 20 launches has a ~10% pump rate — so on any given new mint from them,
+ * the base-rate expectation is "dumps near zero" unless other signals
+ * (outsider inflow, cohort divergence) say otherwise for THIS mint.
+ *
+ * Note on the join: coin_stats.wallet_group and tagged_wallets.label are
+ * both human-readable cluster names (e.g. "Pochi Bin 30") set by whoever
+ * tagged the data — there's no formal foreign key between them in the
+ * source schema, so this is a value match, not a relational one. If your
+ * tagging process ever normalizes casing/spacing, this join gets more
+ * reliable; consider it a known soft spot.
  */
-export const PUMP_THRESHOLD_USD = 100_000;
-
-/**
- * Computes a wallet cluster's historical pump-vs-dump-to-zero track record.
- * This is the core signal for your actual question: "which of their
- * same-day duplicate launches are they going to run up, and which will
- * they just drain." A cluster that's pumped 2 of its last 20 launches has
- * a ~10% pump rate — so on any given new mint from them, the base-rate
- * expectation is "dumps near zero" unless other signals (outsider inflow,
- * cohort divergence) say otherwise for THIS specific mint.
- */
-export async function getClusterTrackRecord(
-  clusterId: string
-): Promise<ClusterTrackRecord | null> {
-  const cluster = await prisma.walletCluster.findUnique({
-    where: { id: clusterId },
-    include: {
-      tokens: { include: { dumpEvents: true } },
-    },
+export async function getClusterTrackRecord(label: string): Promise<ClusterTrackRecord | null> {
+  const launches = await prisma.coinStat.findMany({
+    where: { walletGroup: label },
   });
-  if (!cluster) return null;
+  if (launches.length === 0) return null;
 
-  const totalLaunches = cluster.tokens.length;
-  const migratedCount = cluster.tokens.filter((t) => t.migratedAt !== null).length;
-  const pumpedCount = cluster.tokens.filter(
-    (t) => (t.peakMcapUsd ?? 0) >= PUMP_THRESHOLD_USD
+  const totalLaunches = launches.length;
+  const ranUpCount = launches.filter(
+    (l) => l.outcome === 'pumped' || l.outcome === 'pump_and_dump'
   ).length;
-  const dumpedCount = cluster.tokens.filter((t) => t.status === 'DUMPED' || t.status === 'DEAD')
-    .length;
+  const neverRanUpCount = launches.filter((l) => l.outcome === 'dumped').length;
 
-  const peaks = cluster.tokens
-    .map((t) => t.peakMcapUsd)
+  const peaks = launches
+    .map((l) => l.maxMarketCapUsd)
     .filter((v): v is number => v !== null)
     .sort((a, b) => a - b);
   const medianPeakMcapUsd = peaks.length > 0 ? peaks[Math.floor(peaks.length / 2)] ?? null : null;
 
-  const slotsToFirstDump = cluster.tokens
-    .map((t) => {
-      const firstDump = t.dumpEvents.sort((a, b) => Number(a.slot - b.slot))[0];
-      if (!firstDump || t.bondedSlot === null) return null;
-      return Number(firstDump.slot - t.bondedSlot);
-    })
-    .filter((v): v is number => v !== null && v >= 0);
-  const avgSlotsToFirstDump =
-    slotsToFirstDump.length > 0
-      ? slotsToFirstDump.reduce((a, b) => a + b, 0) / slotsToFirstDump.length
-      : null;
+  const durations = launches
+    .map((l) => l.durationMinutes)
+    .filter((v): v is number => v !== null)
+    .sort((a, b) => a - b);
+  const medianDurationMinutes =
+    durations.length > 0 ? durations[Math.floor(durations.length / 2)] ?? null : null;
 
   return {
-    clusterId,
-    label: cluster.label,
+    label,
     totalLaunches,
-    migratedCount,
-    pumpedCount,
-    dumpedCount,
-    pumpRate: totalLaunches > 0 ? pumpedCount / totalLaunches : 0,
+    ranUpCount,
+    neverRanUpCount,
+    pumpRate: totalLaunches > 0 ? ranUpCount / totalLaunches : 0,
     medianPeakMcapUsd,
-    avgSlotsToFirstDump,
+    medianDurationMinutes,
   };
+}
+
+/**
+ * Looks up a cluster's track record starting from a wallet address instead
+ * of a label — convenience for callers holding a holder row (which has
+ * clusterLabel already resolved) or a bare cluster_parent wallet.
+ */
+export async function getClusterTrackRecordForWallet(
+  walletAddress: string
+): Promise<ClusterTrackRecord | null> {
+  const wallet = await prisma.taggedWallet.findUnique({ where: { address: walletAddress } });
+  if (!wallet?.label) return null;
+  return getClusterTrackRecord(wallet.label);
 }

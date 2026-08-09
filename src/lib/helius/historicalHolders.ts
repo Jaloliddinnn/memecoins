@@ -59,11 +59,16 @@ export async function getHistoricalHolders(
       },
     },
     orderBy: { percentOfSupply: 'desc' },
-    include: { wallet: { include: { cluster: true } } },
   });
 
   if (cached.length > 0) {
-    return snapshotRowsToResponse(mintAddress, cached, true);
+    // holder_snapshots has no DB relation to tagged_wallets (see schema
+    // comment) — join in application code instead.
+    const cachedTags = await prisma.taggedWallet.findMany({
+      where: { address: { in: cached.map((c) => c.walletAddress) } },
+    });
+    const tagByWallet = new Map(cachedTags.map((t) => [t.address, t]));
+    return snapshotRowsToResponse(mintAddress, cached, tagByWallet, true);
   }
 
   const connection = getConnection();
@@ -99,10 +104,9 @@ export async function getHistoricalHolders(
 
   const walletAddresses = [...balances.keys()].filter((w) => (balances.get(w) ?? 0n) > 0n);
   const tags = await prisma.taggedWallet.findMany({
-    where: { walletAddress: { in: walletAddresses } },
-    include: { cluster: true },
+    where: { address: { in: walletAddresses } },
   });
-  const tagByWallet = new Map(tags.map((t) => [t.walletAddress, t]));
+  const tagByWallet = new Map(tags.map((t) => [t.address, t]));
 
   const holders: HolderRow[] = walletAddresses
     .map((walletAddress) => {
@@ -113,10 +117,10 @@ export async function getHistoricalHolders(
         balanceRaw: balanceRaw.toString(),
         percentOfSupply:
           totalSupplyRaw > 0n ? Number((balanceRaw * 10000n) / totalSupplyRaw) / 100 : 0,
-        tagType: (tag?.tagType as HolderRow['tagType']) ?? null,
-        customNote: tag?.customNote ?? null,
-        clusterId: tag?.clusterId ?? null,
-        clusterLabel: tag?.cluster?.label ?? null,
+        tagType: (tag?.tag as HolderRow['tagType']) ?? null,
+        note: tag?.notes ?? tag?.note ?? null,
+        clusterLabel: tag?.label ?? null,
+        clusterParent: tag?.clusterParent ?? null,
       };
     })
     .sort((a, b) => b.percentOfSupply - a.percentOfSupply)
@@ -159,6 +163,14 @@ async function fetchEnhancedTransactionsForMint(
   return all.filter((tx) => tx.timestamp >= windowStartUnix && tx.timestamp <= windowEndUnix);
 }
 
+interface CachedTag {
+  tag: string;
+  notes: string | null;
+  note: string | null;
+  label: string | null;
+  clusterParent: string | null;
+}
+
 function snapshotRowsToResponse(
   mintAddress: string,
   rows: Array<{
@@ -169,18 +181,22 @@ function snapshotRowsToResponse(
     walletAddress: string;
     solInPool: number | null;
     marketCapUsd: number | null;
-  } & { wallet: { tagType: string; customNote: string | null; clusterId: string | null; cluster: { label: string | null } | null } | null }>,
+  }>,
+  tagByWallet: Map<string, CachedTag>,
   isHistorical: boolean
 ): HolderTableResponse {
-  const holders: HolderRow[] = rows.map((r) => ({
-    walletAddress: r.walletAddress,
-    balanceRaw: String(r.balanceRaw),
-    percentOfSupply: r.percentOfSupply,
-    tagType: (r.wallet?.tagType as HolderRow['tagType']) ?? null,
-    customNote: r.wallet?.customNote ?? null,
-    clusterId: r.wallet?.clusterId ?? null,
-    clusterLabel: r.wallet?.cluster?.label ?? null,
-  }));
+  const holders: HolderRow[] = rows.map((r) => {
+    const tag = tagByWallet.get(r.walletAddress);
+    return {
+      walletAddress: r.walletAddress,
+      balanceRaw: String(r.balanceRaw),
+      percentOfSupply: r.percentOfSupply,
+      tagType: (tag?.tag as HolderRow['tagType']) ?? null,
+      note: tag?.notes ?? tag?.note ?? null,
+      clusterLabel: tag?.label ?? null,
+      clusterParent: tag?.clusterParent ?? null,
+    };
+  });
 
   const totalPoolSol = rows[0]?.solInPool ?? 0;
   const outsiderVolume = computeOutsiderVolume(holders, totalPoolSol);

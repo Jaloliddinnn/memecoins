@@ -3,10 +3,12 @@ import { prisma } from '@/lib/prisma';
 
 /**
  * POST /api/tag
- * Body: { walletAddress: string, tagType: 'INSIDER'|'OUTSIDER'|'MEV_BOT', customNote?: string, clusterId?: string }
+ * Body: { walletAddress: string, tagType: 'insider'|'outsider'|'mev_bot', notes?: string, label?: string, clusterParent?: string }
  *
- * Upserts a wallet tag. Because scammers reuse the same wallet cluster for
- * ~a month, this is the write side of the "auto-recognize known wallets on
+ * Upserts a wallet tag into the real `tagged_wallets` table (address is
+ * the primary key — one tag applies globally to a wallet, matching your
+ * existing data). Because scammers reuse the same wallet cluster for ~a
+ * month, this is the write side of the "auto-recognize known wallets on
  * every future scan" feature — the read side is the tag join in
  * lib/helius/holders.ts.
  */
@@ -19,33 +21,43 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { walletAddress, tagType, customNote, clusterId } = body as {
+  const { walletAddress, tagType, notes, label, clusterParent } = body as {
     walletAddress: string;
     tagType: string;
-    customNote?: string;
-    clusterId?: string;
+    notes?: string;
+    label?: string;
+    clusterParent?: string;
   };
 
-  if (!['INSIDER', 'OUTSIDER', 'MEV_BOT'].includes(tagType)) {
-    return NextResponse.json({ error: 'tagType must be INSIDER, OUTSIDER, or MEV_BOT' }, { status: 400 });
+  if (!['insider', 'outsider', 'mev_bot'].includes(tagType)) {
+    return NextResponse.json({ error: 'tagType must be insider, outsider, or mev_bot' }, { status: 400 });
   }
 
+  const now = BigInt(Date.now());
+
   const wallet = await prisma.taggedWallet.upsert({
-    where: { walletAddress },
+    where: { address: walletAddress },
     update: {
-      tagType: tagType as 'INSIDER' | 'OUTSIDER' | 'MEV_BOT',
-      customNote: customNote ?? undefined,
-      clusterId: clusterId ?? undefined,
+      tag: tagType,
+      notes: notes ?? undefined,
+      label: label ?? undefined,
+      clusterParent: clusterParent ?? undefined,
+      updatedAt: now,
     },
     create: {
-      walletAddress,
-      tagType: tagType as 'INSIDER' | 'OUTSIDER' | 'MEV_BOT',
-      customNote,
-      clusterId,
+      address: walletAddress,
+      tag: tagType,
+      notes,
+      label,
+      clusterParent,
+      createdAt: now,
+      updatedAt: now,
     },
   });
 
-  return NextResponse.json(wallet);
+  // BigInt fields (createdAt/updatedAt) don't serialize via JSON.stringify
+  // by default, so convert them to strings before responding.
+  return NextResponse.json(serializeWallet(wallet));
 }
 
 /**
@@ -57,6 +69,14 @@ export async function DELETE(req: NextRequest) {
   if (!walletAddress) {
     return NextResponse.json({ error: 'Missing required "walletAddress" query param' }, { status: 400 });
   }
-  await prisma.taggedWallet.delete({ where: { walletAddress } }).catch(() => null);
+  await prisma.taggedWallet.delete({ where: { address: walletAddress } }).catch(() => null);
   return NextResponse.json({ ok: true });
+}
+
+function serializeWallet(w: Awaited<ReturnType<typeof prisma.taggedWallet.upsert>>) {
+  return {
+    ...w,
+    createdAt: w.createdAt?.toString() ?? null,
+    updatedAt: w.updatedAt?.toString() ?? null,
+  };
 }

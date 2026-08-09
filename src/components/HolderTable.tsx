@@ -4,9 +4,9 @@ import type { HolderTableResponse, TagType } from '@/types';
 import { TagToggle } from './TagToggle';
 
 const TAG_DOT: Record<TagType, string> = {
-  INSIDER: 'bg-insider',
-  OUTSIDER: 'bg-outsider',
-  MEV_BOT: 'bg-mevbot',
+  insider: 'bg-insider',
+  outsider: 'bg-outsider',
+  mev_bot: 'bg-mevbot',
 };
 
 function shorten(address: string): string {
