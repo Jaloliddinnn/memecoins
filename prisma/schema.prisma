@@ -1,0 +1,170 @@
+// Solana Meme Coin Holder Tracker & Anti-Scam Dashboard
+//
+// NOTE: You told me you already have a Neon DB with 20k+ scammer wallets
+// grouped into clusters. This schema is my best-guess design matching the
+// spec you gave me (tagged_wallets 1:1) plus the extension tables needed for
+// cluster track-record scoring. Before your first migration, run:
+//
+//   npx prisma db pull
+//
+// against your real DATABASE_URL — that will overwrite the model bodies
+// below with whatever your existing tables actually look like. Reconcile
+// field names/types here against that output, then `prisma generate`.
+// Everything in src/ reads through the field names defined here, so a
+// rename during introspection just means updating this file, not the app.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum TagType {
+  INSIDER
+  OUTSIDER
+  MEV_BOT
+
+  @@map("tag_type")
+}
+
+enum TokenStatus {
+  BONDING // still on the Pump.fun bonding curve
+  MIGRATED // crossed 100%, moved to PumpSwap AMM
+  PUMPING // migrated and market cap is climbing beyond bonding mcap
+  DUMPED // confirmed coordinated exit detected (see DumpEvent)
+  DEAD // liquidity gone / effectively zero
+
+  @@map("token_status")
+}
+
+/// Matches the spec's `tagged_wallets` table exactly, plus an optional
+/// cluster link so wallets known to move together can be scored as a group.
+model TaggedWallet {
+  walletAddress String   @id @map("wallet_address") @db.VarChar(44)
+  tagType       TagType  @map("tag_type")
+  customNote    String?  @map("custom_note")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  clusterId String?        @map("cluster_id")
+  cluster   WalletCluster? @relation(fields: [clusterId], references: [id])
+
+  holderSnapshots HolderSnapshot[]
+  createdTokens   Token[]          @relation("TokenCreator")
+
+  @@index([clusterId])
+  @@map("tagged_wallets")
+}
+
+/// A group of wallets believed to be operated by the same scammer/team,
+/// inferred from shared funding source, co-occurrence as top holders across
+/// multiple mints, or manual grouping of your existing 20k-wallet dataset.
+/// This is what makes "will they pump or dump this one" answerable: score
+/// the cluster's history, not the single token.
+model WalletCluster {
+  id          String   @id @default(cuid())
+  label       String? // e.g. "Cluster A — reused since 2026-07"
+  notes       String?
+  firstSeenAt DateTime @default(now()) @map("first_seen_at") @db.Timestamptz(6)
+
+  members    TaggedWallet[]
+  tokens     Token[]
+  dumpEvents DumpEvent[]
+
+  @@map("wallet_clusters")
+}
+
+/// One row per mint you've scanned. Tracks the bonding -> migration ->
+/// outcome lifecycle so cluster track records can be computed.
+model Token {
+  mintAddress String  @id @map("mint_address") @db.VarChar(44)
+  name        String?
+  symbol      String?
+
+  creatorWallet String?       @map("creator_wallet") @db.VarChar(44)
+  creator       TaggedWallet? @relation("TokenCreator", fields: [creatorWallet], references: [walletAddress])
+
+  clusterId String?        @map("cluster_id")
+  cluster   WalletCluster? @relation(fields: [clusterId], references: [id])
+
+  // Same-name multi-launch cohort tracking: scammers launch several mints
+  // with the same name/symbol same day and only run one up. Group siblings
+  // under a shared key (e.g. hash of normalized name + launch date) to
+  // compare outsider inflow across the cohort early.
+  launchCohortKey String? @map("launch_cohort_key")
+
+  bondedAt     DateTime? @map("bonded_at") @db.Timestamptz(6)
+  bondedSlot   BigInt?   @map("bonded_slot")
+  bondingMcapUsd Float?  @map("bonding_mcap_usd")
+
+  migratedAt   DateTime? @map("migrated_at") @db.Timestamptz(6)
+  migratedSlot BigInt?   @map("migrated_slot")
+  pumpswapPool String?   @map("pumpswap_pool") @db.VarChar(44)
+
+  peakMcapUsd Float?    @map("peak_mcap_usd")
+  peakMcapAt  DateTime? @map("peak_mcap_at") @db.Timestamptz(6)
+
+  status    TokenStatus @default(BONDING)
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  snapshots  HolderSnapshot[]
+  dumpEvents DumpEvent[]
+
+  @@index([clusterId])
+  @@index([creatorWallet])
+  @@index([launchCohortKey])
+  @@map("tokens")
+}
+
+/// Point-in-time holder table capture. Populated on every live scan AND
+/// used as the cache for Time-Travel mode so a repeated historical query
+/// for the same (mint, slot) never re-hits Helius.
+model HolderSnapshot {
+  id            String  @id @default(cuid())
+  mintAddress   String  @map("mint_address") @db.VarChar(44)
+  token         Token   @relation(fields: [mintAddress], references: [mintAddress])
+  walletAddress String  @map("wallet_address") @db.VarChar(44)
+  wallet        TaggedWallet? @relation(fields: [walletAddress], references: [walletAddress])
+
+  balanceRaw      Decimal @map("balance_raw") @db.Decimal(38, 0)
+  percentOfSupply Float   @map("percent_of_supply")
+  solInPool       Float?  @map("sol_in_pool")
+  marketCapUsd    Float?  @map("market_cap_usd")
+
+  slot       BigInt
+  capturedAt DateTime @default(now()) @map("captured_at") @db.Timestamptz(6)
+
+  @@index([mintAddress, capturedAt])
+  @@index([mintAddress, slot])
+  @@index([walletAddress])
+  @@map("holder_snapshots")
+}
+
+/// A detected coordinated exit: multiple cluster-tagged wallets selling
+/// within the same slot / short window. This is the ground truth used to
+/// compute each cluster's historical dump behavior (how big were their
+/// runs before they cut, how often do they even bother pumping at all).
+model DumpEvent {
+  id          String @id @default(cuid())
+  mintAddress String @map("mint_address") @db.VarChar(44)
+  token       Token  @relation(fields: [mintAddress], references: [mintAddress])
+
+  clusterId String?        @map("cluster_id")
+  cluster   WalletCluster? @relation(fields: [clusterId], references: [id])
+
+  slot            BigInt
+  walletsInvolved Int     @map("wallets_involved")
+  tokensSoldRaw   Decimal @map("tokens_sold_raw") @db.Decimal(38, 0)
+  mcapBeforeUsd   Float?  @map("mcap_before_usd")
+  mcapAfterUsd    Float?  @map("mcap_after_usd")
+
+  detectedAt DateTime @default(now()) @map("detected_at") @db.Timestamptz(6)
+
+  @@index([mintAddress])
+  @@index([clusterId])
+  @@map("dump_events")
+}
