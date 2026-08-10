@@ -18,6 +18,10 @@
 
 generator client {
   provider = "prisma-client-js"
+  // Railway/Nixpacks runs Debian with OpenSSL 3.x. Without an explicit target,
+  // `prisma generate` guesses from the build host and can fail or emit an
+  // engine the deployed container cannot load.
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
