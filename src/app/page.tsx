@@ -100,7 +100,7 @@ export default function Page() {
           </p>
           <div className="mt-2.5 flex items-center gap-2">
             <span
-              className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"
+              className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"
               style={{
                 background:
                   cfg.confidence === 'high'
