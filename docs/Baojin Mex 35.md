@@ -2,7 +2,7 @@
 
 > Second group dossier for the Solana memecoin anti-scam project. All data derived
 > from live on-chain analysis (Helius mainnet RPC + Enhanced Transactions API),
-> DexScreener, and the `tagged_wallets` database, 2026-08-03 → 2026-08-10.
+> DexScreener, and the `tagged_wallets` database, 2026-08-03 → **2026-08-11**.
 >
 > **Naming decoded:** the operator's label convention encodes the funding source and
 > amount. `Bin` = Binance, `Mex` = MEXC, number = SOL sent to each dev.
@@ -27,6 +27,7 @@
 7. [THE SIGNAL — full data, all 32 backtest coins](#7-the-signal--full-data-all-32-backtest-coins)
 8. [The failed coins — what happened](#8-the-failed-coins--what-happened)
 9. [Forward test — out of sample](#9-forward-test--out-of-sample)
+9b. [Forward test 2 — `94JvwZgb` (TISUKI)](#9b-forward-test-2--94jvwzgb-tisuki-2026-08-11)
 10. [Baojin vs Pochi — key differences](#10-baojin-vs-pochi--key-differences)
 11. [Entry / exit playbook](#11-entry--exit-playbook)
 12. [Things that DON'T work](#12-things-that-dont-work-tested-and-dead)
@@ -39,14 +40,22 @@
 **A wallet from the `tagged_wallets` database buys ≥3 SOL of a freshly-migrated
 coin → ENTER. Sell on a timer.**
 
-| | Backtest | Forward test |
-|---|---|---|
-| Coins analysed | 32 (4 devs) | 3 (1 new dev) |
-| Signals fired | 14 | 2 |
-| Median return from signal | **x2.12** | x2.50 / x4.31 |
-| Worst return | **x1.19** (still +19%) | — |
-| Losing trades | **0** | 0 |
-| Correct skips | 17 of 17 no-signal deaths | 1 of 1 |
+| | Backtest | Forward test 1 | Forward test 2 |
+|---|---|---|---|
+| Coins analysed | 32 (4 devs) | 3 (1 new dev) | 2 (1 new dev) |
+| Signals fired | 14 | 2 | 1 |
+| Median return from signal | **x2.12** | x2.50 / x4.31 | **x8.08** |
+| Worst return | **x1.19** (still +19%) | — | — |
+| Losing trades | **0** | 0 | 0 |
+| Correct skips | 17 of 17 no-signal deaths | 1 of 1 | 1 of 1 |
+
+**Running total: 17 signals fired, 0 losing trades, 19 of 19 correct skips.**
+
+> ### ⚠ 2026-08-11 — the volume bot was reconfigured
+> The `0.002074080 SOL` buy-size fingerprint is **dead**. The fleet now uses
+> randomized micro-amounts, so any detector keyed on that constant will silently
+> report zero bot activity. **The wallet list still works — better than ever.**
+> See [§6](#6-the-volume-bot-fleet).
 
 **Critical conditions:**
 1. The buyer must be a **tagged cluster wallet**, not any random buyer. Without
@@ -94,7 +103,7 @@ Separately there is a **bot-fleet funder**:
 
 ## 3. The devs
 
-### Analysed in depth (the 4 the operator supplied + 1 forward test)
+### Analysed in depth (the 4 the operator supplied + 2 forward tests)
 
 | Dev wallet | Token name | Funded | Launches | Migrated |
 |---|---|---|---|---|
@@ -103,15 +112,28 @@ Separately there is a **bot-fleet funder**:
 | `5X8pBaf3k7X9ZiSagYeHyucaeE2PZzDJ8xfgw4jwKcZG` | PUMPGA ("Make Pumpfun Great Again") | 35.0000 SOL, 2026-08-06 09:48 | 56 | 9 |
 | `GghmQaR563bQxEQwnob3TFmUmFzcJNgppcyMST7RVysr` | TOYBOT | 35.0000 SOL, 2026-08-07 08:34 | 49 | 10 |
 | `5TPpCbUkxBbZ3DzgwxCdm6w6Vb26v716iHeiPBe5JZQ9` | TOADGF | 35.0000 SOL, 2026-08-08 12:35 | 12 | 3 |
+| `94JvwZgbgCCZqd6L5XiZJPqvBCnTUdViRSevoARWKCQu` | TISUKI | 35.0000 SOL, 2026-08-10 14:07 | 13 | 2 |
 
 Devs run **sequentially, not in parallel** — `GghmQaR5` was funded 30 minutes
 after `5X8pBaf3` went silent.
 
-**Note:** `5TPpCbUk` still holds **198.45 SOL** (every other dev was drained to
-~0.005 SOL). He is likely still active — watch for more launches.
+### ⚠ The dev lifecycle changed after 2026-08-08
+
+The original pattern was: 40–57 launches, then drain the wallet to ~0.005 SOL and
+abandon it. **The two most recent devs did neither.**
+
+| Dev | Launches | Balance after session |
+|---|---|---|
+| `6CYroyv9`, `G3rfSian`, `5X8pBaf3`, `GghmQaR5` | 42–57 | ~0.005 SOL |
+| `5TPpCbUk` (08-08) | 12 | **198.45 SOL** |
+| `94JvwZgb` (08-10) | 13 | **215.54 SOL** |
+
+**Short bursts, and the dev keeps the profit.** `94JvwZgb` turned 35 SOL into
+215 SOL in 13.5 hours. Do not assume a dev is finished because it went quiet, and
+do not use "wallet drained" as an end-of-session marker any more.
 
 **Tagging status:** `G3rfSian` and `6CYroyv9` are already tagged `Baojin Mex 35`.
-`5X8pBaf3`, `GghmQaR5` and `5TPpCbUk` are **NOT tagged — add them.**
+`5X8pBaf3`, `GghmQaR5`, `5TPpCbUk` and `94JvwZgb` are **NOT tagged — add them.**
 
 ---
 
@@ -120,10 +142,13 @@ after `5X8pBaf3` went silent.
 ### Per-session pattern
 1. Treasury sends exactly ~35 SOL to a fresh dev wallet.
 2. Dev sits idle for 8–17 hours.
-3. Dev launches **40–57 tokens in a 6–8 hour burst**, all with the **identical
-   name and symbol** (CHOCI, BAOJIN, PUMPGA, TOYBOT, TOADGF).
+3. Dev launches tokens in a burst, all with the **identical name and symbol**
+   (CHOCI, BAOJIN, PUMPGA, TOYBOT, TOADGF, TISUKI).
+   - Before 2026-08-08: **40–57 tokens over 6–8 hours**
+   - After: **12–13 tokens over ~2–13 hours** (see §3)
 4. ~9–20% reach migration. The rest die on the bonding curve.
-5. Dev wallet drained, abandoned.
+5. Dev wallet drained and abandoned — **no longer true after 2026-08-08**; the
+   two most recent devs kept 198–215 SOL.
 
 ### Bonding-curve phase (pre-migration)
 | Metric | Range | Median |
@@ -177,7 +202,7 @@ Do not re-analyse these. They are bot configuration.
 | LP deposit at migration | 84.99 SOL + 206,900,000 tokens |
 | Total supply | 1,000,000,000 |
 | Starting mcap (untouched curve) | 30.00 virtual SOL ≈ $2,137 |
-| Volume-bot buy size | **0.002074080 SOL** (identical to 9 decimals) |
+| Volume-bot buy size | ~~**0.002074080 SOL**~~ **OBSOLETE from 2026-08-11 — randomized, see §6** |
 | Bot-wallet funding | 0.0150 SOL each |
 | Migration destination | PumpSwap AMM |
 | Pump.fun program | `6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P` |
@@ -198,9 +223,53 @@ Do not re-analyse these. They are bot configuration.
 - **Zero pre-positioning.** 0 of 1,831 traded during the bonding curve. The fleet
   is completely cold until it fires.
 
-### Why the bot is NOT the entry signal
-The fleet fires **after** the price is already up. On both measured coins it
-arrived at ~$77,000 — 2.45x migration mcap — leaving only x1.15–x1.20.
+### ⚠ 2026-08-11 — the buy-size fingerprint is DEAD
+
+Measured on `94JvwZgb`'s two migrations. **Zero trades at `0.002074080 SOL` on
+either coin.** They have randomized the amount:
+
+| | Before | After 2026-08-11 |
+|---|---|---|
+| Buy size | `0.002074080` exactly, thousands of repeats | **randomized** |
+| Range | — | ~`0.000001` – `0.000009` SOL (≈1,000× smaller) |
+| Distinct sizes | 1 | **3,419 across 4,368 buys** |
+
+Sample of the new sizes: `0.000003176`, `0.000002030`, `0.000008066`,
+`0.000001543` SOL — the most frequent value repeats only **5 times**.
+
+This is deliberate anti-fingerprinting. **Any detector keyed on the old constant
+now reports zero bot activity on a live pump.**
+
+### The wallet list survived — use it instead
+
+`docs/baojin-volume-bot-wallets.txt` still separates pumps from deaths cleanly,
+and the margin got wider:
+
+| Coin | Known-fleet wallets | Outcome |
+|---|---|---|
+| `2NZrFmUr5Sdu9ZeB9gjuU2BEFVxjgoybyewTytxmpump` | **1,797** | 6.62x |
+| `Am7yWQn1jjviUQ1YH6XwEL8R8GFXrk6AGKUbzkZLpump` | **3** | died at +0s |
+
+**Detect the fleet by address, never by buy size.** The addresses have been stable
+across every dev measured; the amount has now changed once and can change again.
+
+### Why the bot WAS not the entry signal — and why that may have flipped
+
+Originally the fleet fired **after** the price was already up. On both coins
+measured before 2026-08-11 it arrived at ~$77,000 — 2.45x migration mcap —
+leaving only x1.15–x1.20.
+
+**On `2NZrFmUr` the timing inverted.** First fleet buy at **+18 seconds**, at
+**$7,502 — 0.24x migration price**, while the coin looked dead. Peak was $207,468.
+
+| Entry | Time | MC | Return to peak |
+|---|---|---|---|
+| Fleet onset | **+18s** | **$7,502** | **x27.66** |
+| 1st tagged ≥3 SOL buy | +460s | $25,664 | x8.08 |
+
+That is a far earlier and far cheaper entry than the standard rule — **but n=1.**
+Do not trade it yet. Test whether fleet-onset consistently front-runs across more
+coins before touching it; on the older coins it was the opposite.
 
 Three wallets appear before the burst on every coin, pumped *and* dead — they are
 generic snipers, **not** a signal:
@@ -388,6 +457,52 @@ Two of the three were already at −94% within an hour. **The exit is everything
 
 ---
 
+## 9b. Forward test 2 — `94JvwZgb` (TISUKI), 2026-08-11
+
+Dev **`94JvwZgbgCCZqd6L5XiZJPqvBCnTUdViRSevoARWKCQu`**, funded 35.0000 SOL on
+2026-08-10 14:07, launched 2026-08-11 01:33–03:37. 13 launches, 2 migrated.
+**Analysed while the dev was still live.**
+
+| Contract address | Signal | Entry MC | Peak | Result |
+|---|---|---|---|---|
+| `2NZrFmUr5Sdu9ZeB9gjuU2BEFVxjgoybyewTytxmpump` | **YES** — 22 buys, 1st at +460s, 3.56 SOL, max 6.85 SOL | **$25,664** (0.82x mig) | $207,468 (6.62x) @ +60.2m | **x8.08** ✓ |
+| `Am7yWQn1jjviUQ1YH6XwEL8R8GFXrk6AGKUbzkZLpump` | **NO** — zero tagged buys ≥3 SOL | — | $34,853 (1.11x) @ **+0s** | correctly skipped ✓ |
+
+**2 of 2 correct.**
+
+### Entry ladder — reproduced the §7c ordering exactly
+
+| Enter at | Time | Entry MC | Return |
+|---|---|---|---|
+| **#1** | +460s | **$25,664** | **x8.08** |
+| #4 | +642s | $69,922 | x2.97 |
+| #8 | +1639s | $82,907 | x2.50 |
+
+### Every structural constant held
+
+| Metric | This dev | Dossier range |
+|---|---|---|
+| Failed sniper txs | 68.8% / 86.6% | 68.7–97.3% ✓ |
+| Curve duration | 15.0 / 2.4 min | 0.8–60.8 ✓ |
+| Cluster supply at migration | 73.56% / 76.39% | 74.7–78.3% ✓ |
+| Real outsiders | 5.85% / 2.92% | 1.05–4.62% ⚠ dead coin ran over |
+| Dev buy tier | 9.7668 SOL = 26.35% (small) | 5.5–12.7 SOL, 17–32% ✓ |
+| Migration rate | 15.4% | 9–20% ✓ |
+| Terminal price | **$1,507 / $1,598** | $1,500–2,000 ✓ |
+
+**Size filter held perfectly ([§7d](#7d-size-filter)):** the dead coin's largest
+tagged buy was **0 SOL** — it drew no qualifying buys at all. The pump's first buy
+was **3.56 SOL**, already past the >3.5 high-confidence threshold, and it peaked
+at 6.85 SOL.
+
+### The exit, again
+
+Peak $207,468 at **+60.2 min**. By **+120 min it was $1,830** — it gave back 99%
+in under an hour. This is the third forward-test coin in a row where the entry
+rule was right and the whole outcome depended on selling in time.
+
+---
+
 ## 10. Baojin vs Pochi — key differences
 
 | | Pochi Bin 30 | **Baojin Mex 35** |
@@ -415,20 +530,29 @@ makes the ≥3 SOL deviation stand out.
 2. Watch every migrated coin from any known dev.
 3. Stream PumpSwap pool buys. Match each buyer against `tagged_wallets`
    (24,142 addresses).
+4. Match buyers against `docs/baojin-volume-bot-wallets.txt` **by address, not by
+   buy size** — the size fingerprint was retired on 2026-08-11 ([§6](#6-the-volume-bot-fleet)).
 
 ### Entry
-4. **First tagged buy ≥3 SOL → BUY IMMEDIATELY.**
+5. **First tagged buy ≥3 SOL → BUY IMMEDIATELY.**
    - Typically fires **+9s to +662s** after migration
    - Entry mcap typically **$10,000–$50,000**, often *below* the $31,336
      migration price
    - Buy > 3.5 SOL → size up (never seen on a dead coin)
    - Buy 3.0–3.3 SOL → smaller size
+   - **Scan the full 30-minute window, not the first few minutes.** On
+     `2NZrFmUr` the signal landed at **+460s**; a 5-minute scan reports "no
+     signal" on a coin that went on to return x8.08.
 
 ### Exit
-5. **Mechanical only.** Signal→peak windows ranged **0s to 631s**, median ~74s.
-   - Hard timer 90–120 seconds, OR
-   - Trailing stop 20–25%
-   - **Never hold.** Every coin ends at ~$1,500.
+6. **Mechanical only.** Signal→peak windows ranged **0s to 631s** in the original
+   backtest, but the two most recent pumps peaked at **+60 minutes**, so a fixed
+   90-second timer would have captured very little of them.
+   - Trailing stop 20–25% is the safer default now
+   - **Never hold.** Every coin ends at ~$1,500 — `2NZrFmUr` gave back 99% in the
+     hour after its peak.
+   - This remains the weakest part of the playbook. Signal→peak timing is not
+     stable across sessions.
 
 ### Skip
 6. No ≥3 SOL tagged buy within ~12 minutes → **skip**. Correct on 17 of 17
@@ -462,7 +586,19 @@ makes the ≥3 SOL deviation stand out.
 
 ## 13. Open work
 
-- [ ] **Tag the 3 untagged devs**: `5X8pBaf3k7X9…`, `GghmQaR563bQ…`, `5TPpCbUkxBbZ…`
+- [ ] **Tag the 4 untagged devs**: `5X8pBaf3k7X9…`, `GghmQaR563bQ…`,
+      `5TPpCbUkxBbZ…`, `94JvwZgbgCCZ…`
+- [ ] **Re-extract the volume-bot fleet** from post-2026-08-11 coins. The
+      `0.002074080 SOL` size filter that built the original 1,831-address list no
+      longer matches anything — new fleet members added since the reconfiguration
+      cannot be discovered by the old method. Extract by co-occurrence across
+      pumped coins instead.
+- [ ] **Test whether fleet-onset now front-runs the ≥3 SOL signal.** On
+      `2NZrFmUr` it fired at +18s / 0.24x mig (x27.66 to peak) vs the standard
+      signal at +460s / 0.82x (x8.08). n=1 — needs 5+ coins before it is tradeable.
+- [ ] **Solve the exit.** Signal→peak was ~74s median in the backtest but +60 min
+      on both recent pumps. Backtest trailing stops (15/20/25/30%) against fixed
+      timers across every signalled coin.
 - [ ] Re-run the backtest **without the 2,500-signature cap** to confirm
       `8pSLyKBo` recall (expected 10/10, measured 9/10)
 - [ ] Test the rule on the remaining **97 treasury-funded devs** — currently
