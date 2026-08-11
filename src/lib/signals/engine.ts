@@ -98,6 +98,8 @@ export interface AnalysisResult {
 }
 
 const EARLY_WINDOW_SEC = 300;
+/** Max signatures parsed inside the entry window before we start sampling. */
+const DENSE_CAP = 2000;
 /** Safety ceiling on pagination. A fresh migration is far below this. */
 const SIGNATURE_CAP = 60_000;
 
@@ -206,11 +208,27 @@ export async function analyze(mint: string, group: GroupId): Promise<AnalysisRes
     return base;
   }
 
-  // Parse the first 5 minutes — that is where every decision lives — plus a
-  // sample of later activity so the peak is not understated.
-  const early = ok.filter((s) => s.blockTime <= poolOpen + EARLY_WINDOW_SEC).slice(0, 600);
-  const later = ok.filter((s) => s.blockTime > poolOpen + EARLY_WINDOW_SEC);
-  const step = Math.max(1, Math.floor(later.length / 300));
+  // Parse densely across the whole window in which this group's signal can
+  // fire — NOT a fixed 5 minutes. JINPACHI decides at +45s, but a Baojin
+  // signal routinely lands 7-10 minutes in, and a 5-minute scan reports
+  // "no signal" on a coin that had 13 qualifying buys.
+  const denseWindow = Math.max(EARLY_WINDOW_SEC, cfg.entryWindowSec);
+  const inWindow = ok.filter((s) => s.blockTime <= poolOpen + denseWindow);
+
+  let early = inWindow;
+  if (inWindow.length > DENSE_CAP) {
+    // Too busy to parse exhaustively inside the budget. Spread the sample so a
+    // qualifying buy is unlikely to be missed, and say so — a "no signal"
+    // result from a sampled window is weaker evidence than one from a full scan.
+    const stride = Math.ceil(inWindow.length / DENSE_CAP);
+    early = inWindow.filter((_, i) => i % stride === 0);
+    warnings.push(
+      `Very busy pool: ${inWindow.length.toLocaleString()} transactions inside the entry window, sampled 1 in ${stride}. A "no signal" result here is not conclusive — re-run in a few seconds.`
+    );
+  }
+
+  const later = ok.filter((s) => s.blockTime > poolOpen + denseWindow);
+  const step = Math.max(1, Math.floor(later.length / 200));
   const sampled = later.filter((_, i) => i % step === 0);
 
   const txs = await parseSignatures([...early, ...sampled].map((s) => s.signature));
