@@ -35,6 +35,7 @@ export interface TokenTradeRow {
   isOpen: boolean;
   /** Tokens arrived without the wallet paying SOL (airdrop, bundle push, routing). */
   receivedFree: boolean;
+  marketCapUsd?: number;
 }
 
 export interface WalletHistory {
@@ -104,6 +105,7 @@ class WalletHistoryService {
           row.symbol = (pair.baseToken.symbol || '').replace('$', '');
           row.name = pair.baseToken.name;
           if (pair.info?.imageUrl) row.logoURI = pair.info.imageUrl;
+          if (pair.fdv || pair.marketCap) row.marketCapUsd = pair.fdv || pair.marketCap;
           // A live non-pumpfun pair means it graduated off the curve
           if (pair.dexId && !/pump/i.test(pair.dexId)) {
             row.status = 'migrated';
@@ -125,6 +127,7 @@ class WalletHistoryService {
           if (!row.symbol && coin.symbol) row.symbol = String(coin.symbol).replace('$', '');
           if (!row.name && coin.name) row.name = String(coin.name);
           if (!row.logoURI && coin.image_uri) row.logoURI = String(coin.image_uri);
+          if (coin.usd_market_cap) row.marketCapUsd = Number(coin.usd_market_cap);
           if (row.status === 'unknown') {
             row.status = coin.complete || coin.raydium_pool ? 'migrated' : 'bonding';
             row.statusSource = 'pump.fun';

@@ -1,11 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Sheet } from './Sheet';
 import type { WalletHistory } from '@/lib/tracker/walletHistory';
 import type { TagType } from '@/lib/tracker/types';
 
 const sol = (v: number) => `${v >= 0 ? '' : '−'}${Math.abs(v).toFixed(2)}`;
+
+function formatMC(usd?: number) {
+  if (!usd) return 'Unknown MC';
+  if (usd >= 1e6) return `$${(usd / 1e6).toFixed(1)}M MC`;
+  return `$${(usd / 1e3).toFixed(0)}k MC`;
+}
 
 export function WalletHistorySheet({
   address,
@@ -23,6 +29,16 @@ export function WalletHistorySheet({
   const [data, setData] = useState<WalletHistory | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [coins, setCoins] = useState(10);
+  const [sortBy, setSortBy] = useState<'pnl' | 'date' | 'mcap'>('pnl');
+
+  const sortedTokens = useMemo(() => {
+    if (!data?.tokens) return [];
+    return [...data.tokens].sort((a, b) => {
+      if (sortBy === 'date') return b.lastTime - a.lastTime;
+      if (sortBy === 'mcap') return (b.marketCapUsd ?? 0) - (a.marketCapUsd ?? 0);
+      return b.pnlSol - a.pnlSol;
+    });
+  }, [data?.tokens, sortBy]);
 
   useEffect(() => {
     setData(null);
@@ -106,31 +122,53 @@ export function WalletHistorySheet({
             ))}
           </div>
 
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--text-dim)] mr-1">Sort:</span>
+            {(['pnl', 'date', 'mcap'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setSortBy(s)}
+                className={`px-3 py-1.5 rounded-lg text-[11.5px] font-medium capitalize transition ${sortBy === s ? 'bg-[var(--surface-2)] text-[var(--text)]' : 'text-[var(--text-dim)] hover:bg-[var(--surface-2)]'}`}
+              >
+                {s === 'mcap' ? 'Market Cap' : s}
+              </button>
+            ))}
+          </div>
+
           <div className="glass overflow-hidden rounded-2xl">
             <div className="border-b hairline px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--text-dim)]">
               Last {data.tokens.length} coins traded
               {data.truncated && ` · ${data.totalMintsSeen}+ seen`}
             </div>
             <ul className="divide-y divide-[var(--hairline)]">
-              {data.tokens.map((t) => (
+              {sortedTokens.map((t) => (
                 <li key={t.mint}>
                   <button
                     type="button"
                     onClick={() => onScanCoin(t.mint)}
                     className="flex w-full items-center gap-3 px-4 py-2.5 text-left active:bg-white/5"
                   >
-                    <span
-                      aria-hidden
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{
-                        background:
-                          t.status === 'migrated'
-                            ? 'var(--green)'
-                            : t.status === 'bonding'
-                              ? 'var(--amber)'
-                              : 'var(--text-dim)',
-                      }}
-                    />
+                    <div className="relative shrink-0 flex items-center justify-center">
+                      {t.logoURI ? (
+                        <img src={t.logoURI} alt="" className="h-8 w-8 rounded-full object-cover bg-[var(--surface-2)]" />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-[var(--surface-2)] flex items-center justify-center text-[10px] font-bold text-[var(--text-dim)] uppercase">
+                          {t.symbol?.slice(0, 2) || '?'}
+                        </div>
+                      )}
+                      <span
+                        aria-hidden
+                        className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--surface)]"
+                        style={{
+                          background:
+                            t.status === 'migrated'
+                              ? 'var(--green)'
+                              : t.status === 'bonding'
+                                ? 'var(--amber)'
+                                : 'var(--text-dim)',
+                        }}
+                      />
+                    </div>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13.5px] font-medium">
                         {t.displayName}
@@ -140,6 +178,9 @@ export function WalletHistorySheet({
                         {t.receivedFree && (
                           <span className="ml-1.5 text-[10px] text-[var(--text-dim)]">FREE</span>
                         )}
+                      </span>
+                      <span className="tnum block truncate text-[10.5px] text-[var(--text-dim)]">
+                        {formatMC(t.marketCapUsd)} · {new Date(t.lastTime * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                       </span>
                       <span className="tnum block truncate text-[10.5px] text-[var(--text-dim)]">
                         in {t.solSpent.toFixed(2)} · out {t.solReceived.toFixed(2)} SOL ·{' '}
