@@ -154,12 +154,12 @@ export default function CoinsPage() {
         ))}
       </div>
 
-      <div className="mt-2 flex items-center justify-between px-1">
+      <div className="mt-2 flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
         <span className="tnum text-[11.5px] text-[var(--text-dim)]">
           {filtered.length} shown · {stats.pumped} pumped · {stats.dumped} dumped · peak{' '}
           {money(stats.peak)}
         </span>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-[10px] uppercase font-semibold text-[var(--text-dim)] mr-1">Sort:</span>
           {(['saved', 'peak', 'insider'] as const).map(s => (
             <button
