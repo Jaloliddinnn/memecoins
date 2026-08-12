@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { CoinOutcome, CoinStats } from '@/lib/tracker/types';
+import { Sheet } from '@/components/tracker/Sheet';
 
 const OUTCOME_STYLE: Record<CoinOutcome, { label: string; color: string }> = {
   pumped: { label: 'Pumped', color: 'var(--green)' },
@@ -28,6 +29,13 @@ export default function CoinsPage() {
   const [group, setGroup] = useState('all');
   const [outcome, setOutcome] = useState<'all' | CoinOutcome>('all');
   const [sortKey, setSortKey] = useState<'saved' | 'peak' | 'insider'>('saved');
+  const [detailsFor, setDetailsFor] = useState<CoinStats | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const flash = (m: string) => {
+    setToast(m);
+    setTimeout(() => setToast((t) => (t === m ? null : t)), 3200);
+  };
 
   const load = () => {
     setLoading(true);
@@ -194,7 +202,10 @@ export default function CoinsPage() {
           const o = OUTCOME_STYLE[c.outcome];
           return (
             <li key={c.mint} className="glass rounded-xl px-3 py-2.5 flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-3">
+              <div 
+                className="flex items-center justify-between gap-3 cursor-pointer group"
+                onClick={() => setDetailsFor(c)}
+              >
                 <div className="flex items-center gap-3 min-w-0">
                   {c.logoURI ? (
                     <img src={c.logoURI} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover bg-[var(--surface-2)]" />
@@ -216,7 +227,18 @@ export default function CoinsPage() {
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-dim)] mt-0.5">
-                      <span className="font-mono truncate">{c.mint.slice(0, 5)}…{c.mint.slice(-4)}</span>
+                      <button
+                        type="button"
+                        title="Copy Address"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(c.mint);
+                          flash('Address copied');
+                        }}
+                        className="font-mono truncate hover:text-[var(--text)] transition cursor-copy"
+                      >
+                        {c.mint.slice(0, 5)}…{c.mint.slice(-4)}
+                      </button>
                       <span className="shrink-0 opacity-50">·</span>
                       <span className="truncate">{c.walletGroup || 'ungrouped'}</span>
                     </div>
@@ -277,6 +299,77 @@ export default function CoinsPage() {
           );
         })}
       </ul>
+
+      {detailsFor && (
+        <Sheet
+          title={detailsFor.symbol || detailsFor.name || 'Unknown Coin'}
+          subtitle={detailsFor.mint}
+          onClose={() => setDetailsFor(null)}
+        >
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {[
+                { l: 'Group', v: detailsFor.walletGroup || 'Ungrouped' },
+                { l: 'Duration', v: detailsFor.durationMinutes > 0 ? `${detailsFor.durationMinutes}m` : 'Unknown' },
+                { l: 'Holders', v: detailsFor.holderCount.toLocaleString() },
+                { l: 'Market Cap', v: money(detailsFor.marketCapUsd) },
+                { l: 'Peak MC', v: money(detailsFor.maxMarketCapUsd) },
+                { l: 'Liquidity', v: `${detailsFor.liquiditySol.toFixed(1)} SOL` },
+              ].map((s) => (
+                <div key={s.l} className="rounded-xl bg-[var(--surface-2)] px-3 py-2.5">
+                  <div className="text-[10px] uppercase tracking-[0.05em] text-[var(--text-dim)]">{s.l}</div>
+                  <div className="tnum mt-0.5 text-[14px] font-semibold">{s.v}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-2xl border hairline overflow-hidden">
+              <div className="border-b hairline px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--text-dim)] bg-[var(--surface-2)]">
+                Supply Distribution
+              </div>
+              <div className="px-4 py-3 grid grid-cols-3 gap-2">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.05em] text-[var(--text-dim)]">Insider</div>
+                  <div className="tnum text-[14px] font-semibold" style={{ color: 'var(--red)' }}>{detailsFor.insiderPercent.toFixed(1)}%</div>
+                  <div className="tnum mt-0.5 text-[11px] text-[var(--text-dim)]">{detailsFor.insiderCount} wallets</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.05em] text-[var(--text-dim)]">Outsider</div>
+                  <div className="tnum text-[14px] font-semibold" style={{ color: 'var(--green)' }}>{detailsFor.outsiderPercent.toFixed(1)}%</div>
+                  <div className="tnum mt-0.5 text-[11px] text-[var(--text-dim)]">{detailsFor.outsiderCount} wallets</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.05em] text-[var(--text-dim)]">LP</div>
+                  <div className="tnum text-[14px] font-semibold" style={{ color: 'var(--blue)' }}>{detailsFor.lpPercent.toFixed(1)}%</div>
+                  <div className="tnum mt-0.5 text-[11px] text-[var(--text-dim)]">{detailsFor.lpSol.toFixed(1)} SOL</div>
+                </div>
+              </div>
+            </div>
+
+            {detailsFor.notes && (
+              <div className="rounded-2xl border hairline overflow-hidden">
+                <div className="border-b hairline px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--text-dim)] bg-[var(--surface-2)]">
+                  Notes
+                </div>
+                <div className="px-4 py-3 text-[13px] leading-relaxed whitespace-pre-wrap">
+                  {detailsFor.notes}
+                </div>
+              </div>
+            )}
+            
+            <div className="flex justify-between items-center px-1 text-[11px] text-[var(--text-dim)]">
+              <span>Saved: {new Date(detailsFor.snapshotAt || detailsFor.createdAt || Date.now()).toLocaleString()}</span>
+              {detailsFor.isPumpFun && <span>Pump.fun launch</span>}
+            </div>
+          </div>
+        </Sheet>
+      )}
+
+      {toast && (
+        <div className="fixed inset-x-4 bottom-24 z-[60] mx-auto max-w-[400px] lg:bottom-6">
+          <div className="glass rise rounded-2xl px-4 py-3 text-[13px] font-medium shadow-lg flex items-center justify-center">{toast}</div>
+        </div>
+      )}
     </main>
   );
 }
