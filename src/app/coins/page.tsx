@@ -193,63 +193,62 @@ export default function CoinsPage() {
         {filtered.map((c) => {
           const o = OUTCOME_STYLE[c.outcome];
           return (
-            <li key={c.mint} className="glass rounded-2xl px-4 py-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-[15px] font-semibold">
-                    {c.symbol || c.name || 'Unknown'}
-                  </div>
-                  <div className="truncate font-mono text-[10.5px] text-[var(--text-dim)]">
-                    {c.mint}
+            <li key={c.mint} className="glass rounded-xl px-3 py-2.5 flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  {c.logoURI ? (
+                    <img src={c.logoURI} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover bg-[var(--surface-2)]" />
+                  ) : (
+                    <div className="h-10 w-10 shrink-0 rounded-full bg-[var(--surface-2)] flex items-center justify-center text-[12px] font-bold text-[var(--text-dim)] uppercase">
+                      {c.symbol?.slice(0, 2) || '?'}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex flex-col justify-center">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="text-[14.5px] font-semibold truncate">
+                        {c.symbol || c.name || 'Unknown'}
+                      </span>
+                      <span
+                        className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+                        style={{ background: `${o.color}22`, color: o.color }}
+                      >
+                        {o.label}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-dim)] mt-0.5">
+                      <span className="font-mono truncate">{c.mint.slice(0, 5)}…{c.mint.slice(-4)}</span>
+                      <span className="shrink-0 opacity-50">·</span>
+                      <span className="truncate">{c.walletGroup || 'ungrouped'}</span>
+                    </div>
                   </div>
                 </div>
-                <span
-                  className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"
-                  style={{ background: `${o.color}22`, color: o.color }}
-                >
-                  {o.label}
-                </span>
+
+                <div className="flex flex-col items-end shrink-0 justify-center">
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)] mb-0.5">Peak</div>
+                      <div className="tnum text-[12px] font-semibold leading-none">{money(c.maxMarketCapUsd)}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)] mb-0.5">In</div>
+                      <div className="tnum text-[12px] font-semibold leading-none" style={{ color: 'var(--red)' }}>{c.insiderPercent.toFixed(1)}%</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)] mb-0.5">Out</div>
+                      <div className="tnum text-[12px] font-semibold leading-none" style={{ color: 'var(--green)' }}>{c.outsiderPercent.toFixed(1)}%</div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="mt-2.5 grid grid-cols-3 gap-2">
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.05em] text-[var(--text-dim)]">
-                    Peak
-                  </div>
-                  <div className="tnum text-[13.5px] font-semibold">
-                    {money(c.maxMarketCapUsd)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.05em] text-[var(--text-dim)]">
-                    Insider
-                  </div>
-                  <div className="tnum text-[13.5px] font-semibold" style={{ color: 'var(--red)' }}>
-                    {c.insiderPercent.toFixed(1)}%
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.05em] text-[var(--text-dim)]">
-                    Outsider
-                  </div>
-                  <div
-                    className="tnum text-[13.5px] font-semibold"
-                    style={{ color: 'var(--green)' }}
-                  >
-                    {c.outsiderPercent.toFixed(1)}%
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-2.5 flex items-center justify-between gap-2">
-                <span className="truncate text-[11px] text-[var(--text-dim)]">
-                  {c.walletGroup || 'ungrouped'}
-                  {c.durationMinutes > 0 && ` · ${c.durationMinutes}m`}
+              <div className="flex items-center justify-between border-t border-[var(--hairline)] pt-2 mt-0.5">
+                <span className="text-[10.5px] text-[var(--text-dim)]">
+                  {c.durationMinutes > 0 ? `Tracked for ${c.durationMinutes}m` : 'No duration recorded'}
                 </span>
-                <div className="flex shrink-0 gap-3">
+                <div className="flex shrink-0 gap-4">
                   <Link
                     href={`/scan?mint=${c.mint}`}
-                    className="text-[12px] font-semibold text-[var(--blue)]"
+                    className="text-[11.5px] font-semibold text-[var(--blue)] transition hover:opacity-80"
                   >
                     Rescan
                   </Link>
@@ -263,7 +262,7 @@ export default function CoinsPage() {
                       );
                       if (res.ok) setCoins((prev) => prev.filter((x) => x.mint !== c.mint));
                     }}
-                    className="text-[12px] font-semibold"
+                    className="text-[11.5px] font-semibold transition hover:opacity-80"
                     style={{ color: 'var(--red)' }}
                   >
                     Delete
@@ -272,7 +271,7 @@ export default function CoinsPage() {
               </div>
 
               {c.notes && (
-                <p className="mt-2 text-[12px] leading-[1.45] text-[var(--text-dim)]">{c.notes}</p>
+                <p className="mt-1 text-[11.5px] leading-[1.45] text-[var(--text-dim)] bg-[var(--surface-2)] p-2.5 rounded-lg">{c.notes}</p>
               )}
             </li>
           );
