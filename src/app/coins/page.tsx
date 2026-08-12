@@ -139,13 +139,13 @@ export default function CoinsPage() {
       </div>
 
       {/* Outcome + sort */}
-      <div className="mt-2 grid grid-cols-5 gap-1 rounded-2xl bg-[var(--surface-2)] p-1">
+      <div className="mt-2 flex flex-wrap gap-1 rounded-2xl bg-[var(--surface-2)] p-1">
         {(['all', 'pumped', 'dumped', 'pump_and_dump', 'neutral'] as const).map((o) => (
           <button
             key={o}
             type="button"
             onClick={() => setOutcome(o)}
-            className={`min-h-[36px] rounded-xl text-[11px] font-semibold transition ${
+            className={`flex-1 min-w-[65px] min-h-[36px] rounded-xl text-[11px] font-semibold transition ${
               outcome === o ? 'bg-[var(--blue)] text-white' : 'text-[var(--text-dim)]'
             }`}
           >
@@ -246,7 +246,7 @@ export default function CoinsPage() {
                 </div>
 
                 <div className="flex flex-col items-end shrink-0 justify-center">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 sm:gap-3">
                     <div className="text-right">
                       <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)] mb-0.5">Peak</div>
                       <div className="tnum text-[12px] font-semibold leading-none">{money(c.maxMarketCapUsd)}</div>

@@ -424,13 +424,13 @@ export default function ScanPage() {
 
           {/* Right column on desktop */}
           <div className="mt-3 space-y-2 lg:mt-0">
-            <div className="grid grid-cols-5 gap-1 rounded-2xl bg-[var(--surface-2)] p-1">
+            <div className="flex flex-wrap gap-1 rounded-2xl bg-[var(--surface-2)] p-1">
               {(['all', 'insider', 'outsider', 'untagged', 'lp'] as const).map((f) => (
                 <button
                   key={f}
                   type="button"
                   onClick={() => setFilter(f)}
-                  className={`min-h-[38px] rounded-xl text-[11.5px] font-semibold capitalize transition ${
+                  className={`flex-1 min-w-[60px] min-h-[38px] rounded-xl text-[11.5px] font-semibold capitalize transition ${
                     filter === f ? 'bg-[var(--blue)] text-white' : 'text-[var(--text-dim)]'
                   }`}
                 >

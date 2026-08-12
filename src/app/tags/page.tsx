@@ -270,7 +270,7 @@ export default function TagsPage() {
             placeholder="Group label (e.g. Baojin Mex 35)"
             className="mt-2 w-full rounded-xl bg-[var(--surface-2)] px-3 py-3 text-[15px] outline-none placeholder:text-[var(--text-dim)]"
           />
-          <div className="mt-2 grid grid-cols-4 gap-1.5">
+          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
             {(['insider', 'outsider', 'lp', 'untagged'] as TagType[]).map((t) => (
               <button
                 key={t}
