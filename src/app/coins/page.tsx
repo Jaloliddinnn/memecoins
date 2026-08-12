@@ -151,15 +151,19 @@ export default function CoinsPage() {
           {filtered.length} shown · {stats.pumped} pumped · {stats.dumped} dumped · peak{' '}
           {money(stats.peak)}
         </span>
-        <button
-          type="button"
-          onClick={() =>
-            setSortKey((k) => (k === 'saved' ? 'peak' : k === 'peak' ? 'insider' : 'saved'))
-          }
-          className="text-[11.5px] font-semibold text-[var(--blue)]"
-        >
-          {sortKey === 'saved' ? 'Newest' : sortKey === 'peak' ? 'Peak' : 'Insider %'}
-        </button>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] uppercase font-semibold text-[var(--text-dim)] mr-1">Sort:</span>
+          {(['saved', 'peak', 'insider'] as const).map(s => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSortKey(s)}
+              className={`px-2 py-1 rounded text-[11px] font-medium transition ${sortKey === s ? 'bg-[var(--surface-2)] text-[var(--text)]' : 'text-[var(--text-dim)] hover:bg-[var(--surface-2)]'}`}
+            >
+              {s === 'saved' ? 'Date' : s === 'peak' ? 'Peak MC' : 'Insider %'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error && (
@@ -185,7 +189,7 @@ export default function CoinsPage() {
         </p>
       )}
 
-      <ul className="mt-3 grid gap-2 lg:grid-cols-2 xl:grid-cols-3">
+      <ul className="mt-3 grid gap-2">
         {filtered.map((c) => {
           const o = OUTCOME_STYLE[c.outcome];
           return (
