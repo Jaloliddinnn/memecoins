@@ -215,7 +215,7 @@ export default function CoinsPage() {
                     </div>
                   )}
                   <div className="min-w-0 flex flex-col justify-center">
-                    <div className="flex items-center gap-2 truncate">
+                    <div className="flex items-center gap-2 min-w-0">
                       <span className="text-[14.5px] font-semibold truncate">
                         {c.symbol || c.name || 'Unknown'}
                       </span>
@@ -226,7 +226,7 @@ export default function CoinsPage() {
                         {o.label}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-dim)] mt-0.5">
+                    <div className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-dim)] mt-0.5 min-w-0">
                       <button
                         type="button"
                         title="Copy Address"
