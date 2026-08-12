@@ -129,6 +129,8 @@ export interface CoinStats {
   totalSupply: number;
   devAddress?: string;
   isPumpFun: boolean;
+  entryPoints?: string;
+  dipMcap?: string;
 
   notes?: string;
   snapshotAt: number;

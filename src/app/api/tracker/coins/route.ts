@@ -53,6 +53,8 @@ export async function POST(request: Request) {
     totalSupply: body.totalSupply ?? 0,
     devAddress: body.devAddress,
     isPumpFun: body.isPumpFun ?? false,
+    entryPoints: body.entryPoints,
+    dipMcap: body.dipMcap,
     notes: body.notes,
     snapshotAt: body.snapshotAt ?? now,
     createdAt: body.createdAt,

@@ -119,6 +119,7 @@ const COIN_COLUMNS = `
   lp_sol, lp_percent, holder_count,
   price_usd, liquidity_sol, total_supply,
   dev_address, is_pump_fun, notes, logo_uri,
+  entry_points, dip_mcap,
   snapshot_at, created_at, updated_at`;
 
 function rowToCoin(r: Record<string, unknown>): CoinStats {
@@ -146,6 +147,8 @@ function rowToCoin(r: Record<string, unknown>): CoinStats {
     devAddress: (r.dev_address as string) ?? undefined,
     isPumpFun: Boolean(r.is_pump_fun),
     notes: (r.notes as string) ?? undefined,
+    entryPoints: (r.entry_points as string) ?? undefined,
+    dipMcap: (r.dip_mcap as string) ?? undefined,
     snapshotAt: num(r.snapshot_at, Date.now()),
     createdAt: num(r.created_at, Date.now()),
     updatedAt: num(r.updated_at, Date.now()),
@@ -175,7 +178,7 @@ export async function saveCoin(stats: CoinStats): Promise<void> {
   const now = Date.now();
   await sql(
     `INSERT INTO coin_stats (${COIN_COLUMNS}) VALUES
-     ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
+     ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
      ON CONFLICT (mint) DO UPDATE SET
        name = EXCLUDED.name,
        symbol = EXCLUDED.symbol,
@@ -199,6 +202,8 @@ export async function saveCoin(stats: CoinStats): Promise<void> {
        is_pump_fun = EXCLUDED.is_pump_fun,
        notes = EXCLUDED.notes,
        logo_uri = COALESCE(EXCLUDED.logo_uri, coin_stats.logo_uri),
+       entry_points = EXCLUDED.entry_points,
+       dip_mcap = EXCLUDED.dip_mcap,
        snapshot_at = EXCLUDED.snapshot_at,
        updated_at = EXCLUDED.updated_at`,
     [
@@ -225,6 +230,8 @@ export async function saveCoin(stats: CoinStats): Promise<void> {
       stats.isPumpFun,
       stats.notes || null,
       stats.logoURI || null,
+      stats.entryPoints || null,
+      stats.dipMcap || null,
       stats.snapshotAt,
       stats.createdAt ?? now,
       now,
