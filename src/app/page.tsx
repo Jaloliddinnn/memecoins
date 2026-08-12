@@ -78,7 +78,7 @@ export default function Page() {
   const cfg = GROUPS[group];
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-[430px] px-4 pb-16 pt-3">
+    <main className="mx-auto min-h-dvh w-full max-w-[430px] px-4 pb-28 pt-3">
       <header className="flex items-baseline justify-between px-1 pb-4">
         <h1 className="text-[26px] font-bold tracking-[-0.02em]">Migration Check</h1>
         <span className="text-[11px] text-[var(--text-dim)]">post-migration</span>
