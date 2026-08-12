@@ -14,10 +14,12 @@ export function TagSheet({
   holder,
   onClose,
   onApply,
+  onOpenHistory,
 }: {
   holder: TokenHolder;
   onClose: () => void;
   onApply: (tag: TagType, label?: string, notes?: string) => void | Promise<void>;
+  onOpenHistory?: () => void;
 }) {
   const [label, setLabel] = useState(holder.label ?? '');
   const [notes, setNotes] = useState(holder.notes ?? '');
@@ -84,6 +86,16 @@ export function TagSheet({
             </button>
           ))}
         </div>
+
+        {onOpenHistory && (
+          <button
+            type="button"
+            onClick={onOpenHistory}
+            className="mt-2 min-h-[48px] w-full rounded-2xl bg-[var(--surface-2)] text-[15px] font-semibold text-[var(--blue)]"
+          >
+            View trade history
+          </button>
+        )}
 
         <button
           type="button"

@@ -135,3 +135,36 @@ export interface CoinStats {
   createdAt?: number;
   updatedAt: number;
 }
+
+// ---------------------------------------------------------------------------
+// Dev profiler
+// ---------------------------------------------------------------------------
+
+export interface DevCreatedCoin {
+  mint: string;
+  name: string;
+  symbol: string;
+  description?: string;
+  imageUri?: string;
+  isMigrated: boolean;
+  marketCapUsd: number;
+  marketCapSol: number;
+  createdTimestamp: number;
+  replyCount: number;
+  raydiumPool?: string;
+}
+
+export interface DevProfile {
+  walletAddress: string;
+  username?: string;
+  profileImage?: string;
+  bio?: string;
+  totalCoinsCreated: number;
+  migratedCoins: number;
+  deadCoins: number;
+  migrationRate: number;
+  totalMarketCapUsd: number;
+  riskRating: 'CRITICAL_SCAMMER' | 'HIGH_RISK' | 'MODERATE' | 'HIGH_SUCCESS';
+  riskLabel: string;
+  coins: DevCreatedCoin[];
+}

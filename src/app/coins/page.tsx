@@ -81,9 +81,9 @@ export default function CoinsPage() {
   }, [filtered]);
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-[430px] px-4 pb-28 pt-3">
+    <main className="mx-auto min-h-dvh w-full max-w-[430px] px-4 pb-28 pt-3 lg:max-w-6xl lg:px-6 lg:pb-10 lg:pt-6">
       <header className="flex items-baseline justify-between px-1 pb-4">
-        <h1 className="text-[26px] font-bold tracking-[-0.02em]">Saved</h1>
+        <h1 className="text-[26px] font-bold tracking-[-0.02em] lg:text-[32px]">Saved</h1>
         <span className="tnum text-[11px] text-[var(--text-dim)]">{coins.length} coins</span>
       </header>
 
@@ -185,7 +185,7 @@ export default function CoinsPage() {
         </p>
       )}
 
-      <ul className="mt-3 space-y-2">
+      <ul className="mt-3 grid gap-2 lg:grid-cols-2 xl:grid-cols-3">
         {filtered.map((c) => {
           const o = OUTCOME_STYLE[c.outcome];
           return (

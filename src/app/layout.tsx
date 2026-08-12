@@ -26,8 +26,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        {children}
+        {/* Rendered first so the laptop top bar sits above the page. The phone
+            bar is `fixed`, so DOM order does not affect where it lands. */}
         <BottomNav />
+        {children}
       </body>
     </html>
   );

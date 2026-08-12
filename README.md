@@ -1,150 +1,131 @@
-# Memecoin Holder Tracker & Anti-Scam Dashboard
+# Soltracker
 
-Tracks Pump.fun/PumpSwap token holders in real time, lets you tag wallets
-as `insider` / `outsider` / `mev_bot`, and — because scammer teams reuse the
-same wallet cluster across many launches for weeks at a time — scores each
-new launch against that cluster's actual historical track record: do they
-usually run coins up, or drain almost all of them to zero.
+Two tools against organised Pump.fun / PumpSwap scam groups, in one phone-first
+web app:
 
-## Why this exists
+1. **Migration Check** — pick the scam group, paste a freshly migrated
+   contract, get a **buy / skip / unknown** verdict from that group's
+   specific on-chain rules.
+2. **Holder tracker** — the scanner from
+   [Tool-Memecoin](https://github.com/Jaloliddinnn/Tool-Memecoin), ported
+   whole: live holder table, insider/outsider tagging against 24k labelled
+   wallets, dev profiler, wallet history, top traders, and time travel to any
+   past moment.
 
-Pump.fun scammers rarely rug the instant a coin bonds. The typical pattern:
+Everything works on a phone (bottom tab bar, bottom sheets) and on a laptop
+(top nav, two-column layouts).
 
-1. **Block 0 domination** — creator buys 30-50%+ of supply immediately via
-   heavy Jito tips / priority fees.
-2. **Micro-dumping** — a bot sells 3-4M tokens every 10-15s straight into
-   the bonding curve, faking healthy volume to lure outside buyers. Rent is
-   recycled via a tight `create account -> swap -> close account` loop.
-3. **1-second mass dump** — once enough outsider SOL has accumulated, the
-   remaining supply dumps across dozens of wallets in a single Jito bundle.
-4. **Wallet recycling** — the same wallet cluster runs this playbook across
-   dozens of tokens over ~a month.
-5. **Migration** — at 100% bonding, the token migrates to **PumpSwap AMM**
-   (not Raydium); some clusters keep running the coin up post-migration,
-   most don't.
+## Why the group has to be picked by hand
 
-The open question this tool is built to answer: **for a specific cluster,
-which of their (often same-day, same-name) duplicate launches are they
-actually going to run up, and which are just bait?**
+The three groups tracked so far do not share a playbook, so no single rule set
+covers them. The rules live in `src/lib/signals/groups.ts` and come from the
+dossiers in [`docs/`](docs/) — each one is a full on-chain writeup of a group's
+money flow, wallet fleet, bot fingerprints, and per-coin outcomes.
+
+| Group | Funding | The rule in one line |
+| --- | --- | --- |
+| **JINPACHI Bin 20** | Binance, 20 SOL/dev | A bot buys a hardcoded ~50 SOL in the migration block, so every coin opens at ~$80k. You can never buy the floor. |
+| **Baojin Mex 35** | MEXC, ~35 SOL/dev | Entry is gated on a retention window, not on the open. |
+| **Pochi Bin 30** | Binance, 30 SOL/dev | Documented, **not tradeable** — see below. |
+
+### Pochi is deliberately marked "do not trade"
+
+The dossier's headline "10 of 13 coins reached ≥1.95x" is **peak-based** and
+unreachable in practice. Backtesting realistic exits — fixed multiples,
+timed exits, trailing stops — every strategy lost money (best x0.98; trailing
+stops went 6 for 6 losers). The group is kept in the app for wallet
+attribution, not for entries.
+
+**The exit problem is unsolved for all three groups.** The rules say when an
+entry is *not* obviously doomed. They do not tell you when to sell.
+
+## What each screen does
+
+| Screen | Path | What it is |
+| --- | --- | --- |
+| **Signal** | `/` | Group picker + contract input → verdict, with the hard-skip rules for the selected group listed underneath. |
+| **Holders** | `/scan` | Holder table with insider/outsider/LP tagging, group hit counts, dev profiler, top traders, time travel. |
+| **Saved** | `/coins` | Coins you've snapshotted, with your `pumped` / `dumped` / `pump_and_dump` outcome labels. |
+| **Wallets** | `/tags` | The 24k tagged wallets: search, filter by group, bulk add, JSON import/export. |
 
 ## Architecture
 
 ```
-Next.js (App Router, TS) ── React dashboard ── Tailwind
+Next.js 14 App Router (TS, Tailwind) — no ORM, no client-side DB access
         │
-        ├── /api/holders          live or historical holder table (Helius)
-        ├── /api/tag              wallet tag read/write (Neon via Prisma)
-        ├── /api/tokens           tracked launch lifecycle (coin_stats)
-        └── /api/clusters/:label  cluster pump/dump track record
+        ├── /api/signal              group rules → buy / skip / unknown
+        ├── /api/scan                live holder scan
+        └── /api/tracker/
+              ├── tags, tags/list    wallet tags (read, write, paged export)
+              ├── coins              saved coin snapshots
+              ├── groups             cluster labels + wallet counts
+              ├── dev                dev profiler (pump.fun launch history)
+              ├── wallet             per-wallet trade history and PnL
+              ├── top-traders        biggest winners/losers on a mint
+              └── timetravel         holder state at an arbitrary past time
         │
-Prisma ORM ── Neon (serverless Postgres)
-        │
-Helius API (RPC + enhanced tx) ── Solana mainnet
+@neondatabase/serverless (HTTP) ── Neon Postgres
+Helius (RPC + Enhanced Transactions) ── Solana mainnet
 ```
 
-### Database schema (`prisma/schema.prisma`)
+Two tables, both pre-existing and shared with the original tool:
+`tagged_wallets` (~24k rows, `address` is the PK — one tag per wallet
+globally) and `coin_stats` (one row per tracked launch, including the curated
+`outcome` ground truth). `wallet_group` on a coin joins to
+`tagged_wallets.label` **by string value**, not by a foreign key — if tagging
+conventions drift, a lookup silently returns "no history" instead of matching.
 
-This mirrors your **real, already-populated** Neon tables (not a fresh
-design) — introspected directly and copied read-only into this project's
-database:
+### Credentials are server-side only
 
-| Table              | Rows (as of copy) | Purpose                                                                 |
-| ------------------ | ------------------ | ----------------------------------------------------------------------- |
-| `tagged_wallets`    | 24,142              | Your manual `[Insider]/[Outsider]/[MEV/Bot]` tags. `address` is the PK — one tag per wallet, globally, matching how you've been tagging. `label` and `cluster_parent` are how wallets get grouped into a scammer team's cluster. |
-| `coin_stats`        | 32                   | One row per tracked launch, including your curated **`outcome`** ground truth (`dumped` / `pumped` / `pump_and_dump`), precomputed insider/outsider %, peak market cap, duration, and `wallet_group` (the cluster's human label — joins to `tagged_wallets.label` by value, e.g. both saying "Pochi Bin 30"). |
-| `holder_snapshots`  | new, empty at scaffold time | The one genuinely new table: point-in-time holder captures, populated as you scan. Backs the Time-Travel mode cache and the outsider-inflow trend signal. Not FK'd to the other two tables (a freshly-scanned wallet/mint usually isn't tagged/logged yet). |
+The original tool read `VITE_NEON_DATABASE_URL` in the browser, which shipped
+full read/write database credentials to anyone who opened the page. In this
+port nothing under `src/lib/tracker/` is importable from a client component;
+every read and write goes through an `/api` route.
 
-An earlier pass of this scaffold guessed at a 5-table design
-(`wallet_clusters`, `tokens`, `dump_events`, etc.) before your real schema
-was available — that guess has been thrown out. Everything above matches
-what's actually in Neon.
+## Time travel
 
-## Detection design: how risk scoring works
+`src/lib/tracker/historicalScanner.ts` reconstructs holder state at a past
+timestamp by **reverse replay**: anchor on live DAS holdings, replay the
+window `(targetSlot, now]`, and take the earliest `preTokenBalance` seen for
+each touched account. It never crawls signature history from genesis, and it
+throws rather than quietly degrading to live data — a snapshot that silently
+became "now" is worse than a visible failure.
 
-`src/lib/analysis/dumpRisk.ts` computes a transparent, weighted 0-100 score
-from five signals (see file for exact weights/logic):
-
-1. **Cluster pump rate** — of this cluster's past `coin_stats` launches
-   (matched by `wallet_group` == the holder's `tagged_wallets.label`), what
-   fraction ever had `outcome` of `pumped` or `pump_and_dump` vs. straight
-   `dumped`. This uses your curated ground truth directly rather than a
-   guessed market-cap threshold — your strongest signal, since you
-   confirmed they recycle wallets.
-2. **Insider concentration** — tagged insiders still holding a large %
-   post-migration means the move is entirely theirs to make.
-3. **Outsider inflow trend** — comparing `holder_snapshots` over time: is
-   real external SOL accelerating or flatlining? Flatlining after initial
-   hype tends to precede an exit.
-4. **Rent-reclaim loop cadence** — the micro-dump bot's
-   `create → swap → close` loop has a steady rhythm; it going quiet often
-   precedes the coordinated exit (playbook step 3 → step 4 transition).
-   *(Sampling this loop's live state isn't wired up yet — it needs a
-   slot-by-slot instruction-pattern watcher, which is the natural next
-   build after this scaffold. The signal slot exists as an opt-in flag
-   `rentLoopActiveNow`; the sampler doesn't.)*
-5. **Concurrent multi-wallet sells** — multiple cluster-tagged wallets
-   selling within the same slot is the closest thing to a live alarm this
-   stack can raise. Also an opt-in flag (`concurrentClusterSellDetected`)
-   for the same reason — your production data has no dump-event log to
-   query yet.
-
-This is deliberately rule-based and auditable rather than a black box.
-Once `coin_stats.outcome` accumulates more labeled launches, that's the
-point to swap in a learned model behind the same `assessDumpRisk()`
-interface without touching any callers.
-
-### Known gaps (honest, not hidden)
-
-- **Post-migration (PumpSwap) market cap**: `src/lib/solana/pumpswap.ts` is
-  a stub. Bonding-curve market cap (`pumpfun.ts`) is fully implemented
-  against the documented reserve layout; PumpSwap's pool layout needs to be
-  confirmed (program ID + account layout) before it's safe to decode —
-  wrong offsets would silently produce a plausible-but-wrong number, which
-  is worse than a visible gap for a scam-detection tool.
-- **Historical mode accuracy**: per the spec's strict rule, we don't crawl
-  signature history. We binary-search timestamp→slot (`lib/solana/slot.ts`)
-  and reconstruct balances from one bounded page of Helius's parsed
-  enhanced-transactions API within a configurable window
-  (`HISTORICAL_WINDOW_MINUTES`, default 15). That's fast and free-tier
-  friendly, but a wallet's pre-window balance won't be captured — genuinely
-  archive-grade snapshots need a paid archive RPC node (`getAccountInfo` at
-  an exact past slot).
-- **Rent-loop sampler & concurrent-sell detector**: both are opt-in flags
-  in `assessDumpRisk()` with no live feed behind them yet — needs a
-  recent-transaction-pattern watcher for the target mint/cluster.
-- **`wallet_group` ↔ `label` join is a string match, not a real FK** — if
-  tagging conventions ever drift (casing, spacing, renamed clusters), the
-  cluster track record lookup silently returns "no history" instead of
-  matching. Worth normalizing if you start relying on this heavily.
+Rate limiting is adaptive. Helius meters by credit rather than by a clean
+requests-per-second ceiling, and a `getTransaction` sweep burns credits far
+faster than the advertised rate suggests, so the limiter halves itself on
+every 429 and creeps back up after 30 seconds of clean traffic. A deep rewind
+on a busy pool gets slow, not broken. `TRACKER_RPS` raises the ceiling for a
+paid key.
 
 ## Setup
 
 ```bash
 npm install
-cp .env.example .env.local   # fill in DATABASE_URL, HELIUS_API_KEY — never commit this file
-npm run db:generate
+cp .env.example .env.local   # fill in DATABASE_URL and HELIUS_API_KEY
 npm run dev
 ```
 
-The schema already matches your real Neon tables (see above), so
-`db:generate` is normally all you need. If your source tables change shape
-later, `npm run db:introspect` (`prisma db pull`) will re-pull them.
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | yes | Neon **pooled** connection string. The app talks to Neon over HTTP, so it works where a raw TCP connection to 5432 would not. |
+| `HELIUS_API_KEY` | yes | RPC + Enhanced Transactions. |
+| `HELIUS_RPC_URL` | no | Defaults to `https://mainnet.helius-rpc.com`. |
+| `TRACKER_RPS` | no | Starting request rate for historical scans (default 5). Raise it on a paid key. |
 
-Free-tier constraints this app is built around: Helius 1M credits/mo,
-10 requests/sec — the holder fetch is a fixed small number of RPC calls per
-scan (no unbounded loops), and historical mode is bounded by
-`HISTORICAL_WINDOW_MINUTES` for the same reason.
+Deployed on Railway; `main` auto-deploys. Nixpacks already runs `npm ci`, so
+`railway.json` must **not** set a `buildCommand` — a second `npm ci` fails
+with `EBUSY` trying to remove the mounted `node_modules/.cache` volume.
 
-### Data migration note
+## Known limits
 
-The `tagged_wallets` (24,142 rows) and `coin_stats` (32 rows) data was
-copied read-only from an existing Neon project into this one's
-`DATABASE_URL`, verified with matching row counts, distinct-key counts, and
-a numeric checksum on both sides post-copy. The source project was never
-modified. Note: this sandboxed dev environment blocks raw TCP (Postgres
-wire protocol on port 5432) outbound — only HTTPS is allowed — so the
-migration and schema introspection used Neon's HTTP query driver
-(`@neondatabase/serverless`) instead of `psql`/`pg_dump`. Standard Prisma
-(`@prisma/client`, raw TCP) is what the app itself uses at runtime — that
-needs normal outbound network access, which any real dev machine or
-deployment target (Vercel, etc.) has.
+- **Exits are not modelled.** See above. This is the biggest open risk.
+- **Busy pools get sampled.** Past a density cap the engine samples one buy in
+  N and says so. A "no signal" verdict on a sampled pool is not conclusive,
+  and the UI returns `UNKNOWN` rather than a confident skip.
+- **Dev-buy share is unverified.** The on-chain read disagreed with ground
+  truth badly enough (0.27% vs a true 40.85%) that it was pulled out of the
+  verdict. It is displayed, labelled unverified, and not scored.
+- **Wallet history and top traders are capped** at a bounded number of parsed
+  transactions and report `truncated: true` when they hit it, rather than
+  looping through thousands of signatures.
