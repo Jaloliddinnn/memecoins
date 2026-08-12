@@ -76,8 +76,11 @@ export function TimeTravelSheet({
         Rewind to this moment
       </button>
 
-      <p className="mt-3 text-center text-[11px] text-[var(--text-dim)]">
-        A deep rewind replays thousands of transactions — expect 30s to several minutes.
+      <p className="mt-3 text-[11px] leading-[1.5] text-[var(--text-dim)]">
+        Cost scales with how busy the coin was, not with how far back you go: ~10
+        minutes on a hot pool is about a minute of replay. If the window is too big
+        for the RPC key it gives up after ~4 minutes and tells you the rate it
+        managed — it will not hand you a half-replayed table.
       </p>
     </Sheet>
   );

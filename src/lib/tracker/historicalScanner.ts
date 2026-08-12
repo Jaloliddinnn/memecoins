@@ -160,6 +160,11 @@ const DEFAULTS = {
   requestsPerSecond: Number(process.env.TRACKER_RPS) > 0 ? Number(process.env.TRACKER_RPS) : 5,
   maxTransactions: 20_000,
   maxHolders: 400,
+  /**
+   * Wall-clock ceiling on the replay, under the route's 300s maxDuration so
+   * the scan reports its own failure instead of being cut off mid-flight.
+   */
+  budgetMs: 240_000,
 };
 
 // ---------------------------------------------------------------------------
@@ -741,7 +746,8 @@ async function replayWindowToSlot(
   signatures: string[],
   mint: string,
   requestsPerSecond: number,
-  onProgress?: (m: string) => void
+  onProgress?: (m: string) => void,
+  budgetMs = DEFAULTS.budgetMs
 ): Promise<{ rewind: Map<string, RewindEntry>; transactionsReplayed: number }> {
   const rewind = new Map<string, RewindEntry>();
   let replayed = 0;
@@ -750,6 +756,23 @@ async function replayWindowToSlot(
   const startedAt = Date.now();
 
   for (let i = 0; i < signatures.length; i += width) {
+    // A partial replay is not a degraded answer, it is a wrong one: every
+    // account we never reached keeps its LIVE balance and silently reports as
+    // if nothing moved. So the budget throws. The transaction cap alone does
+    // not cover this — a metered key that throttles to 1 rps turns a
+    // comfortably-sized window into an hour-long request that no browser or
+    // platform will wait for.
+    const spent = Date.now() - startedAt;
+    if (spent > budgetMs && i > 0) {
+      const rate = i / (spent / 1000);
+      throw new HistoricalScanError(
+        `Replay ran out of time: ${i.toLocaleString()} of ${signatures.length.toLocaleString()} transactions in ${Math.round(spent / 1000)}s.`,
+        `The RPC key sustained about ${rate.toFixed(1)} tx/s, so this window needs roughly ` +
+          `${Math.round(signatures.length / Math.max(rate, 0.1) / 60)} minutes. Pick a more recent ` +
+          `target time, or use a key with more headroom (raise TRACKER_RPS).`
+      );
+    }
+
     const chunk = signatures.slice(i, i + width);
 
     const txs = await rpc.batch<any>(
@@ -1267,7 +1290,14 @@ class HistoricalScannerService {
 
     if (signatures.length > 0) {
       const replay = await replayWindowToSlot(
-        rpc, signatures.map((s) => s.signature), mint, requestsPerSecond, onProgress
+        rpc,
+        signatures.map((s) => s.signature),
+        mint,
+        requestsPerSecond,
+        onProgress,
+        // Whatever the earlier steps did not spend. Floored so a slow lead-up
+        // still gives the replay a chance to prove itself before giving up.
+        Math.max(30_000, DEFAULTS.budgetMs - (Date.now() - startedAt))
       );
       rewindMap = replay.rewind;
       transactionsReplayed = replay.transactionsReplayed;

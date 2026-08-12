@@ -14,12 +14,17 @@ export function TopTradersSheet({
   onOpenWallet: (address: string) => void;
 }) {
   const [rows, setRows] = useState<TraderRow[] | null>(null);
+  const [scanned, setScanned] = useState<{ txs: number; truncated: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/tracker/top-traders?mint=${encodeURIComponent(mint)}`)
       .then((r) => r.json())
-      .then((j) => (j.error ? setError(j.error) : setRows(j.traders as TraderRow[])))
+      .then((j) => {
+        if (j.error) return setError(j.error);
+        setRows(Array.isArray(j.traders) ? (j.traders as TraderRow[]) : []);
+        setScanned({ txs: Number(j.scannedTxs) || 0, truncated: Boolean(j.truncated) });
+      })
       .catch(() => setError('Scan failed'));
   }, [mint]);
 
@@ -69,6 +74,14 @@ export function TopTradersSheet({
             </li>
           ))}
         </ul>
+      )}
+      {scanned && rows && rows.length > 0 && (
+        <p className="mt-3 text-[11px] leading-[1.5] text-[var(--text-dim)]">
+          From the most recent {scanned.txs.toLocaleString()} transactions.
+          {scanned.truncated
+            ? ' The pool is busier than that cap, so earlier trades — including the open — are not counted here.'
+            : ' That covers the coin’s whole history.'}
+        </p>
       )}
     </Sheet>
   );

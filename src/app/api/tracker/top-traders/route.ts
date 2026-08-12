@@ -15,7 +15,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Not a valid Solana address' }, { status: 400 });
   }
   try {
-    return NextResponse.json({ traders: await topTradersService.fetchTopTraders(mint) });
+    // Flattened, not nested under another `traders` key — the sheet reads
+    // `traders` as the array, and wrapping the whole result object in it made
+    // every scan render as "No trades found".
+    const result = await topTradersService.fetchTopTraders(mint);
+    return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Top-trader scan failed';
     return NextResponse.json({ error: message }, { status: 500 });

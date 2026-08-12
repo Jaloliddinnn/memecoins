@@ -8,6 +8,7 @@
 
 import { PublicKey } from '@solana/web3.js';
 import { getConnection, heliusRpcUrl } from '@/lib/solana/connection';
+import { devProfilerService } from './devProfiler';
 import type {
   HolderMetrics,
   TagType,
@@ -98,23 +99,45 @@ export async function getTokenMetadata(mint: string): Promise<TokenMetadata> {
     /* price stays 0 — the UI shows dashes rather than fake numbers */
   }
 
-  // Creator, for the dev row. Derived from the bonding curve's opening tx.
-  try {
-    const [curve] = PublicKey.findProgramAddressSync(
-      [Buffer.from('bonding-curve'), new PublicKey(mint).toBuffer()],
-      new PublicKey('6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P')
-    );
-    const sigs = await conn.getSignaturesForAddress(curve, { limit: 1000 });
-    const oldest = sigs[sigs.length - 1];
-    if (oldest) {
-      const tx = await conn.getParsedTransaction(oldest.signature, {
-        maxSupportedTransactionVersion: 0,
-      });
-      const payer = tx?.transaction.message.accountKeys.find((k) => k.signer)?.pubkey;
-      if (payer) meta.creatorAddress = payer.toBase58();
+  // Creator, for the dev row and the dev profiler.
+  //
+  // Pump.fun is asked first because it is authoritative and costs one request.
+  // The on-chain path is the fallback, and it has to page: getSignaturesForAddress
+  // returns NEWEST first, so on a curve with more than one page of history the
+  // last element of a single call is not the create transaction, it is an
+  // arbitrary mid-life trade — and its signer is some random sniper, who then
+  // gets profiled as the dev.
+  meta.creatorAddress = (await devProfilerService.getCreatorForMint(mint).catch(() => null)) ?? undefined;
+
+  if (!meta.creatorAddress) {
+    try {
+      const [curve] = PublicKey.findProgramAddressSync(
+        [Buffer.from('bonding-curve'), new PublicKey(mint).toBuffer()],
+        new PublicKey('6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P')
+      );
+
+      let before: string | undefined;
+      let oldest: { signature: string } | undefined;
+      // Bounded: a curve that needs more than 20 pages is not worth the credits
+      // for one optional field.
+      for (let page = 0; page < 20; page++) {
+        const sigs = await conn.getSignaturesForAddress(curve, { limit: 1000, before });
+        if (sigs.length === 0) break;
+        oldest = sigs[sigs.length - 1];
+        if (sigs.length < 1000) break;
+        before = oldest?.signature;
+      }
+
+      if (oldest) {
+        const tx = await conn.getParsedTransaction(oldest.signature, {
+          maxSupportedTransactionVersion: 0,
+        });
+        const payer = tx?.transaction.message.accountKeys.find((k) => k.signer)?.pubkey;
+        if (payer) meta.creatorAddress = payer.toBase58();
+      }
+    } catch {
+      /* creator is optional */
     }
-  } catch {
-    /* creator is optional */
   }
 
   return meta;
