@@ -310,7 +310,7 @@ export default function TagsPage() {
         </div>
       )}
 
-      <ul className="mt-3 divide-y divide-[var(--hairline)] overflow-hidden rounded-2xl border hairline lg:grid lg:grid-cols-2 lg:divide-y-0 lg:gap-px lg:bg-[var(--hairline)]">
+      <ul className="mt-3 divide-y divide-[var(--hairline)] overflow-hidden rounded-2xl border hairline">
         {wallets.map((w) => (
           <li key={w.address} className="bg-[var(--surface)]">
             <div className="flex items-center gap-3 px-4 py-2.5">
