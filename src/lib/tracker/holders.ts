@@ -99,6 +99,44 @@ export async function getTokenMetadata(mint: string): Promise<TokenMetadata> {
     /* price stays 0 — the UI shows dashes rather than fake numbers */
   }
 
+  // Fallback for missing metadata (Pump.fun or Helius DAS)
+  if (meta.name === 'Unknown' || meta.symbol === '???' || !meta.logoURI) {
+    if (meta.isPumpFun) {
+      try {
+        const pRes = await fetch(`https://frontend-api.pump.fun/coins/${mint}`, { cache: 'no-store' });
+        if (pRes.ok) {
+          const pJson = await pRes.json();
+          meta.name = pJson.name || meta.name;
+          meta.symbol = pJson.symbol || meta.symbol;
+          meta.logoURI = pJson.image_uri || meta.logoURI;
+        }
+      } catch { /* ignore */ }
+    }
+
+    if (meta.name === 'Unknown' || meta.symbol === '???' || !meta.logoURI) {
+      try {
+        const hRes = await fetch(heliusRpcUrl(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 'das-asset',
+            method: 'getAsset',
+            params: { id: mint },
+          }),
+          cache: 'no-store',
+        });
+        if (hRes.ok) {
+          const hJson = await hRes.json();
+          const content = hJson.result?.content;
+          meta.name = content?.metadata?.name || meta.name;
+          meta.symbol = content?.metadata?.symbol || meta.symbol;
+          meta.logoURI = content?.links?.image || content?.files?.[0]?.uri || meta.logoURI;
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
   // Creator, for the dev row and the dev profiler.
   //
   // Pump.fun is asked first because it is authoritative and costs one request.

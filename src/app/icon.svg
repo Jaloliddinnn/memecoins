@@ -1,0 +1,10 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="128" fill="#111111" />
+  <path d="M160 200 Q 256 120 352 200 T 160 312 Q 256 392 352 312" stroke="url(#solana-grad)" stroke-width="48" stroke-linecap="round" fill="none" />
+  <defs>
+    <linearGradient id="solana-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14F195" />
+      <stop offset="100%" stop-color="#9945FF" />
+    </linearGradient>
+  </defs>
+</svg>
