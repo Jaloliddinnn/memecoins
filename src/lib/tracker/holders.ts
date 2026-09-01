@@ -10,6 +10,7 @@ import { PublicKey } from '@solana/web3.js';
 import { getConnection, heliusRpcUrl } from '@/lib/solana/connection';
 import { devProfilerService } from './devProfiler';
 import { normalizeImageUri } from './image';
+import { onChainTokenMeta } from './onchainMeta';
 import type {
   HolderMetrics,
   TagType,
@@ -100,17 +101,32 @@ export async function getTokenMetadata(mint: string): Promise<TokenMetadata> {
     /* price stays 0 — the UI shows dashes rather than fake numbers */
   }
 
-  // Fallback for missing metadata (Pump.fun or Helius DAS)
+  // Fallback chain for missing metadata. DexScreener alone is not enough: it
+  // drops a pair the moment liquidity is pulled, returning `pairs: null` — so
+  // a rugged coin has no name, no symbol and no image from that source.
   if (meta.name === 'Unknown' || meta.symbol === '???' || !meta.logoURI) {
     if (meta.isPumpFun) {
       try {
-        const pRes = await fetch(`https://frontend-api.pump.fun/coins/${mint}`, { cache: 'no-store' });
-        if (pRes.ok) {
-          const pJson = await pRes.json();
-          meta.name = pJson.name || meta.name;
-          meta.symbol = pJson.symbol || meta.symbol;
+        // Via fetchPumpJson, which targets frontend-api-v3. The old
+        // `frontend-api.pump.fun` host this used to call directly was retired
+        // and now answers HTTP 530 — every coin saved after that quietly lost
+        // its logo, because this was the only source that had one.
+        const pJson = await devProfilerService.fetchPumpJson(`/coins/${mint}`);
+        if (pJson) {
+          meta.name = (pJson.name as string) || meta.name;
+          meta.symbol = (pJson.symbol as string) || meta.symbol;
           meta.logoURI = normalizeImageUri(pJson.image_uri) || meta.logoURI;
         }
+      } catch { /* ignore */ }
+    }
+
+    // The mint account itself — the one source no vendor can switch off.
+    if (meta.name === 'Unknown' || meta.symbol === '???' || !meta.logoURI) {
+      try {
+        const chain = await onChainTokenMeta(mint);
+        if (meta.name === 'Unknown' && chain.name) meta.name = chain.name;
+        if (meta.symbol === '???' && chain.symbol) meta.symbol = chain.symbol;
+        if (!meta.logoURI && chain.logoURI) meta.logoURI = chain.logoURI;
       } catch { /* ignore */ }
     }
 

@@ -47,6 +47,11 @@ export function CoinAvatar({
       src={logoURI}
       alt=""
       onError={() => setBroken(true)}
+      /* pump.fun logos are full-size uploads (~1-2 MB) served off a public
+         IPFS gateway, so a long saved-coins list would otherwise fetch tens
+         of megabytes before the first row is even scrolled to. */
+      loading="lazy"
+      decoding="async"
       className={`${className} shrink-0 rounded-full object-cover bg-[var(--surface-2)]`}
     />
   );

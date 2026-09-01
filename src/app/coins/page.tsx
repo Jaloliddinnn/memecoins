@@ -32,10 +32,34 @@ export default function CoinsPage() {
   const [sortKey, setSortKey] = useState<'saved' | 'peak' | 'insider'>('saved');
   const [detailsFor, setDetailsFor] = useState<CoinStats | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [repairing, setRepairing] = useState(false);
 
   const flash = (m: string) => {
     setToast(m);
     setTimeout(() => setToast((t) => (t === m ? null : t)), 3200);
+  };
+
+  /**
+   * Backfills name/symbol/logo for rows saved while a metadata source was
+   * down — notably every coin saved after pump.fun retired its v1 API, which
+   * had been the only source with a logo once DexScreener drops the pair.
+   */
+  const repairLogos = async () => {
+    setRepairing(true);
+    flash('Refetching metadata — this can take a minute…');
+    try {
+      const res = await fetch('/api/tracker/repair-metadata');
+      const json = await res.json();
+      if (json.error) flash(json.error);
+      else {
+        flash(json.message ?? 'Repair complete');
+        load();
+      }
+    } catch {
+      flash('Repair failed — try again.');
+    } finally {
+      setRepairing(false);
+    }
   };
 
   const updateOutcome = async (mint: string, next: CoinOutcome) => {
@@ -115,7 +139,17 @@ export default function CoinsPage() {
     <main className="mx-auto min-h-dvh w-full max-w-[430px] px-4 pb-28 pt-3 lg:max-w-6xl lg:px-6 lg:pb-10 lg:pt-6">
       <header className="flex items-baseline justify-between px-1 pb-4">
         <h1 className="text-[26px] font-bold tracking-[-0.02em] lg:text-[32px]">Saved</h1>
-        <span className="tnum text-[11px] text-[var(--text-dim)]">{coins.length} coins</span>
+        <div className="flex items-baseline gap-3">
+          <button
+            type="button"
+            onClick={repairLogos}
+            disabled={repairing}
+            className="text-[11px] font-semibold text-[var(--blue)] disabled:opacity-50"
+          >
+            {repairing ? 'Fixing…' : 'Fix logos'}
+          </button>
+          <span className="tnum text-[11px] text-[var(--text-dim)]">{coins.length} coins</span>
+        </div>
       </header>
 
       <div className="flex items-center gap-2 rounded-2xl bg-[var(--surface-2)] px-3.5 py-1">
@@ -262,21 +296,33 @@ export default function CoinsPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col items-end shrink-0 justify-center">
-                  <div className="flex items-center gap-1.5 sm:gap-3">
-                    <div className="text-right">
-                      <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)] mb-0.5">Peak</div>
-                      <div className="tnum text-[12px] font-semibold leading-none">{money(c.maxMarketCapUsd)}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)] mb-0.5">In</div>
-                      <div className="tnum text-[12px] font-semibold leading-none" style={{ color: 'var(--red)' }}>{c.insiderPercent.toFixed(1)}%</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)] mb-0.5">Out</div>
-                      <div className="tnum text-[12px] font-semibold leading-none" style={{ color: 'var(--green)' }}>{c.outsiderPercent.toFixed(1)}%</div>
+                <div className="flex items-center gap-2.5 shrink-0 sm:gap-3.5">
+                  {/* Peak is the number you scan a group's history by, so it
+                      carries the row rather than sitting level with in/out. */}
+                  <div className="text-right">
+                    <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)] mb-0.5">Peak</div>
+                    <div className="tnum text-[19px] font-bold leading-none sm:text-[22px]">
+                      {money(c.maxMarketCapUsd)}
                     </div>
                   </div>
+                  <div className="flex flex-col gap-1 text-right">
+                    <div className="tnum text-[10.5px] font-semibold leading-none" style={{ color: 'var(--red)' }}>
+                      <span className="text-[var(--text-dim)]">in </span>
+                      {c.insiderPercent.toFixed(1)}%
+                    </div>
+                    <div className="tnum text-[10.5px] font-semibold leading-none" style={{ color: 'var(--green)' }}>
+                      <span className="text-[var(--text-dim)]">out </span>
+                      {c.outsiderPercent.toFixed(1)}%
+                    </div>
+                  </div>
+                  {/* Outcome at a glance. Reinforces the text badge by the
+                      name — never the only carrier of the status. */}
+                  <span
+                    title={o.label}
+                    aria-hidden
+                    className="h-3.5 w-3.5 shrink-0 rounded-full"
+                    style={{ background: o.color, boxShadow: `0 0 0 3px ${o.color}22` }}
+                  />
                 </div>
               </div>
 
