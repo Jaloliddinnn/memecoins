@@ -74,15 +74,34 @@ export function formatEntry(value: number): string {
   return `$${Math.round(value)}`;
 }
 
+export interface MultipleSummary {
+  /** The big number: "8.2x", or "35x-70x" when several entries were logged. */
+  value: string;
+  /** The caption under it: "from $15k", or "from $5k-$10k". */
+  label: string;
+  /** Best-case multiple, for colouring. */
+  x: number;
+}
+
 /**
- * One-line summary for a coin row. A single entry keeps its price for
- * context; several collapse to the range, so the row stays scannable.
+ * Splits a coin's multiples into the headline figure and its caption, so a
+ * row can size them independently — the X is the number being scanned for,
+ * the entry it came from is supporting detail.
  */
-export function summarizeMultiples(multiples: EntryMultiple[]): string | null {
+export function summarizeMultiples(multiples: EntryMultiple[]): MultipleSummary | null {
+  // Sorted biggest-X first, so `best` is the cheapest entry and `worst` the dearest.
   const best = multiples[0];
   if (!best) return null;
-  if (multiples.length === 1) return `${formatMultiple(best.x)} from ${formatEntry(best.entry)}`;
+
+  if (multiples.length === 1) {
+    return { value: formatMultiple(best.x), label: `from ${formatEntry(best.entry)}`, x: best.x };
+  }
+
   const worst = multiples[multiples.length - 1];
   if (!worst) return null;
-  return `${formatMultiple(worst.x)}–${formatMultiple(best.x)}`;
+  return {
+    value: `${formatMultiple(worst.x)}\u2013${formatMultiple(best.x)}`,
+    label: `from ${formatEntry(best.entry)}\u2013${formatEntry(worst.entry)}`,
+    x: best.x,
+  };
 }

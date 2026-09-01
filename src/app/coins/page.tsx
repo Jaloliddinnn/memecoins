@@ -149,7 +149,7 @@ export default function CoinsPage() {
   }, [filtered]);
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-[430px] px-4 pb-28 pt-3 lg:max-w-6xl lg:px-6 lg:pb-10 lg:pt-6">
+    <main className="mx-auto min-h-dvh w-full max-w-[430px] px-4 pb-28 pt-3 lg:max-w-4xl lg:px-6 lg:pb-10 lg:pt-6">
       <header className="flex items-baseline justify-between px-1 pb-4">
         <h1 className="text-[26px] font-bold tracking-[-0.02em] lg:text-[32px]">Saved</h1>
         <div className="flex items-baseline gap-3">
@@ -271,14 +271,14 @@ export default function CoinsPage() {
         {filtered.map((c) => {
           const o = OUTCOME_STYLE[c.outcome];
           const mults = entryMultiples(c.entryPoints, c.maxMarketCapUsd);
-          const multLabel = summarizeMultiples(mults);
+          const mult = summarizeMultiples(mults);
           return (
             <li key={c.mint} className="glass rounded-xl px-3 py-2.5 flex flex-col gap-2">
               <div 
-                className="flex flex-wrap items-center justify-between gap-3 cursor-pointer group"
+                className="flex flex-wrap items-center gap-x-4 gap-y-2 cursor-pointer group"
                 onClick={() => setDetailsFor(c)}
               >
-                <div className="flex items-center gap-3 min-w-[200px] flex-1">
+                <div className="flex min-w-[190px] flex-1 items-center gap-3 sm:w-[260px] sm:flex-none">
                   <CoinAvatar logoURI={c.logoURI} symbol={c.symbol} name={c.name} />
                   <div className="min-w-0 flex flex-col justify-center">
                     <div className="flex items-center gap-2 min-w-0">
@@ -311,24 +311,31 @@ export default function CoinsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 shrink-0 sm:gap-3.5">
+                <div className="flex flex-1 items-center gap-3 sm:gap-4">
                   {/* Peak is the number you scan a group's history by, so it
                       carries the row rather than sitting level with in/out. */}
-                  <div className="text-right">
+                  <div className="w-[104px] shrink-0 text-right sm:w-[128px]">
                     <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)] mb-0.5">Peak</div>
                     <div className="tnum text-[19px] font-bold leading-none sm:text-[22px]">
                       {money(c.maxMarketCapUsd)}
                     </div>
-                    {multLabel && mults[0] && (
-                      <div
-                        className="tnum mt-1 text-[11px] font-bold leading-none"
-                        style={{ color: multipleColor(mults[0].x) }}
-                      >
-                        {multLabel}
+                  </div>
+                  <div className="w-[86px] shrink-0 text-right sm:w-[104px]">
+                    {mult && (
+                      <>
+                      <div className="truncate text-[9px] uppercase tracking-wider text-[var(--text-dim)] mb-0.5">
+                        {mult.label}
                       </div>
+                      <div
+                        className="tnum text-[19px] font-bold leading-none sm:text-[22px]"
+                        style={{ color: multipleColor(mult.x) }}
+                      >
+                        {mult.value}
+                      </div>
+                      </>
                     )}
                   </div>
-                  <div className="flex flex-col gap-1 text-right">
+                  <div className="flex w-[66px] shrink-0 flex-col gap-1 text-right">
                     <div className="tnum text-[10.5px] font-semibold leading-none" style={{ color: 'var(--red)' }}>
                       <span className="text-[var(--text-dim)]">in </span>
                       {c.insiderPercent.toFixed(1)}%
@@ -343,7 +350,7 @@ export default function CoinsPage() {
                   <span
                     title={o.label}
                     aria-hidden
-                    className="h-3.5 w-3.5 shrink-0 rounded-full"
+                    className="ml-auto h-3.5 w-3.5 shrink-0 rounded-full"
                     style={{ background: o.color, boxShadow: `0 0 0 3px ${o.color}22` }}
                   />
                 </div>
