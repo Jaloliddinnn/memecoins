@@ -105,3 +105,10 @@ export function summarizeMultiples(multiples: EntryMultiple[]): MultipleSummary 
     x: best.x,
   };
 }
+
+/** Green once it has actually multiplied, red if it never got back to entry. */
+export function multipleColor(x: number): string {
+  if (x >= 2) return 'var(--green)';
+  if (x < 1) return 'var(--red)';
+  return 'var(--text)';
+}

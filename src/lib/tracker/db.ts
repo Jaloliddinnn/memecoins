@@ -245,16 +245,53 @@ export async function deleteCoin(mint: string): Promise<void> {
 }
 
 /**
- * Targeted update for just the outcome label. Deliberately separate from
- * `saveCoin` — that function is a full-row upsert that defaults every
- * unspecified field to 0/null, so reusing it for a one-field edit would wipe
- * the rest of the row's stats.
+ * Columns the operator may edit by hand after a coin is saved. Everything
+ * else on the row is scan-derived and would just be overwritten by a rescan.
+ * The map is also the whitelist: column names come from here, never from the
+ * request, and values are always bound as parameters.
  */
-export async function updateCoinOutcome(mint: string, outcome: CoinOutcome): Promise<boolean> {
+const EDITABLE_COLUMNS: Record<string, string> = {
+  walletGroup: 'wallet_group',
+  outcome: 'outcome',
+  maxMarketCapUsd: 'max_market_cap_usd',
+  durationMinutes: 'duration_minutes',
+  entryPoints: 'entry_points',
+  dipMcap: 'dip_mcap',
+  notes: 'notes',
+};
+
+/**
+ * Partial update of the hand-edited fields.
+ *
+ * Deliberately not routed through `saveCoin`: that is a full-row upsert which
+ * defaults every unspecified field to 0/null, so using it to change one field
+ * would wipe the rest of the coin's stats. Only the keys actually present in
+ * `patch` are touched. Returns false when the mint is not in the table.
+ */
+export async function updateCoinFields(
+  mint: string,
+  patch: Partial<CoinStats>
+): Promise<boolean> {
   const sql = db();
+  const sets: string[] = [];
+  const values: unknown[] = [];
+
+  for (const [key, column] of Object.entries(EDITABLE_COLUMNS)) {
+    if (!(key in patch)) continue;
+    const raw = (patch as Record<string, unknown>)[key];
+    // Empty text clears the column rather than storing an empty string.
+    values.push(raw === '' || raw === undefined ? null : raw);
+    sets.push(`${column} = $${values.length}`);
+  }
+  if (!sets.length) return false;
+
+  values.push(Date.now());
+  sets.push(`updated_at = $${values.length}`);
+  values.push(mint);
+
   const rows = (await sql(
-    `UPDATE coin_stats SET outcome = $1, updated_at = $2 WHERE mint = $3 RETURNING mint`,
-    [outcome, Date.now(), mint]
+    `UPDATE coin_stats SET ${sets.join(', ')} WHERE mint = $${values.length} RETURNING mint`,
+    values
   )) as Array<{ mint: string }>;
   return rows.length > 0;
 }

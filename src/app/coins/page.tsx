@@ -3,21 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { CoinOutcome, CoinStats } from '@/lib/tracker/types';
-import { Sheet } from '@/components/tracker/Sheet';
 import { CoinAvatar } from '@/components/tracker/CoinAvatar';
-import {
-  entryMultiples,
-  formatEntry,
-  formatMultiple,
-  summarizeMultiples,
-} from '@/lib/tracker/entryMultiple';
-
-/** Green once it has actually multiplied, red if it never got back to entry. */
-function multipleColor(x: number): string {
-  if (x >= 2) return 'var(--green)';
-  if (x < 1) return 'var(--red)';
-  return 'var(--text)';
-}
+import { EditCoinSheet } from '@/components/tracker/EditCoinSheet';
+import { entryMultiples, multipleColor, summarizeMultiples } from '@/lib/tracker/entryMultiple';
 
 const OUTCOME_STYLE: Record<CoinOutcome, { label: string; color: string }> = {
   pumped: { label: 'Pumped', color: 'var(--green)' },
@@ -72,28 +60,6 @@ export default function CoinsPage() {
       flash('Repair failed — try again.');
     } finally {
       setRepairing(false);
-    }
-  };
-
-  const updateOutcome = async (mint: string, next: CoinOutcome) => {
-    setCoins((prev) => prev.map((c) => (c.mint === mint ? { ...c, outcome: next } : c)));
-    setDetailsFor((prev) => (prev && prev.mint === mint ? { ...prev, outcome: next } : prev));
-    try {
-      const res = await fetch('/api/tracker/coins', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mint, outcome: next }),
-      });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        flash(json.error ?? 'Update failed');
-        load();
-        return;
-      }
-      flash(`Marked ${OUTCOME_STYLE[next].label}`);
-    } catch {
-      flash('Network error — try again.');
-      load();
     }
   };
 
@@ -394,125 +360,15 @@ export default function CoinsPage() {
       </ul>
 
       {detailsFor && (
-        <Sheet
-          title={detailsFor.symbol || detailsFor.name || 'Unknown Coin'}
-          subtitle={detailsFor.mint}
+        <EditCoinSheet
+          coin={detailsFor}
           onClose={() => setDetailsFor(null)}
-        >
-          <div className="space-y-4">
-            <div>
-              <div className="mb-1.5 ml-1 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--text-dim)]">
-                Outcome
-              </div>
-              <div className="grid grid-cols-4 gap-1.5">
-                {(['pumped', 'dumped', 'pump_and_dump', 'neutral'] as const).map((o) => {
-                  const style = OUTCOME_STYLE[o];
-                  const active = detailsFor.outcome === o;
-                  return (
-                    <button
-                      key={o}
-                      type="button"
-                      onClick={() => updateOutcome(detailsFor.mint, o)}
-                      className="min-h-[40px] rounded-xl text-[11.5px] font-semibold transition hover:opacity-80"
-                      style={{
-                        background: active ? `${style.color}26` : 'var(--surface-2)',
-                        color: active ? style.color : 'var(--text-dim)',
-                        border: active ? `1px solid ${style.color}40` : '1px solid transparent',
-                      }}
-                    >
-                      {o === 'pump_and_dump' ? 'P&D' : style.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {[
-                { l: 'Group', v: detailsFor.walletGroup || 'Ungrouped' },
-                { l: 'Duration', v: detailsFor.durationMinutes > 0 ? `${detailsFor.durationMinutes}m` : 'Unknown' },
-                { l: 'Holders', v: detailsFor.holderCount.toLocaleString() },
-                { l: 'Market Cap', v: money(detailsFor.marketCapUsd) },
-                { l: 'Peak MC', v: money(detailsFor.maxMarketCapUsd) },
-                { l: 'Liquidity', v: `${detailsFor.liquiditySol.toFixed(1)} SOL` },
-              ].map((s) => (
-                <div key={s.l} className="rounded-xl bg-[var(--surface-2)] px-3 py-2.5">
-                  <div className="text-[10px] uppercase tracking-[0.05em] text-[var(--text-dim)]">{s.l}</div>
-                  <div className="tnum mt-0.5 text-[14px] font-semibold">{s.v}</div>
-                </div>
-              ))}
-            </div>
-
-            {(() => {
-              const mults = entryMultiples(detailsFor.entryPoints, detailsFor.maxMarketCapUsd);
-              if (!mults.length) return null;
-              return (
-                <div className="rounded-2xl border hairline overflow-hidden">
-                  <div className="border-b hairline px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--text-dim)] bg-[var(--surface-2)]">
-                    Entry → peak
-                  </div>
-                  <ul className="divide-y divide-[var(--hairline)]">
-                    {mults.map((m) => (
-                      <li
-                        key={m.entry}
-                        className="flex items-center justify-between px-4 py-2.5"
-                      >
-                        <span className="tnum text-[13px] text-[var(--text-dim)]">
-                          {formatEntry(m.entry)} → {money(detailsFor.maxMarketCapUsd)}
-                        </span>
-                        <span
-                          className="tnum text-[16px] font-bold"
-                          style={{ color: multipleColor(m.x) }}
-                        >
-                          {formatMultiple(m.x)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })()}
-
-            <div className="rounded-2xl border hairline overflow-hidden">
-              <div className="border-b hairline px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--text-dim)] bg-[var(--surface-2)]">
-                Supply Distribution
-              </div>
-              <div className="px-4 py-3 grid grid-cols-3 gap-2">
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.05em] text-[var(--text-dim)]">Insider</div>
-                  <div className="tnum text-[14px] font-semibold" style={{ color: 'var(--red)' }}>{detailsFor.insiderPercent.toFixed(1)}%</div>
-                  <div className="tnum mt-0.5 text-[11px] text-[var(--text-dim)]">{detailsFor.insiderCount} wallets</div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.05em] text-[var(--text-dim)]">Outsider</div>
-                  <div className="tnum text-[14px] font-semibold" style={{ color: 'var(--green)' }}>{detailsFor.outsiderPercent.toFixed(1)}%</div>
-                  <div className="tnum mt-0.5 text-[11px] text-[var(--text-dim)]">{detailsFor.outsiderCount} wallets</div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.05em] text-[var(--text-dim)]">LP</div>
-                  <div className="tnum text-[14px] font-semibold" style={{ color: 'var(--blue)' }}>{detailsFor.lpPercent.toFixed(1)}%</div>
-                  <div className="tnum mt-0.5 text-[11px] text-[var(--text-dim)]">{detailsFor.lpSol.toFixed(1)} SOL</div>
-                </div>
-              </div>
-            </div>
-
-            {detailsFor.notes && (
-              <div className="rounded-2xl border hairline overflow-hidden">
-                <div className="border-b hairline px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--text-dim)] bg-[var(--surface-2)]">
-                  Notes
-                </div>
-                <div className="px-4 py-3 text-[13px] leading-relaxed whitespace-pre-wrap">
-                  {detailsFor.notes}
-                </div>
-              </div>
-            )}
-            
-            <div className="flex justify-between items-center px-1 text-[11px] text-[var(--text-dim)]">
-              <span>Saved: {new Date(detailsFor.snapshotAt || detailsFor.createdAt || Date.now()).toLocaleString()}</span>
-              {detailsFor.isPumpFun && <span>Pump.fun launch</span>}
-            </div>
-          </div>
-        </Sheet>
+          onSaved={(updated, message) => {
+            setCoins((prev) => prev.map((c) => (c.mint === updated.mint ? updated : c)));
+            setDetailsFor(null);
+            flash(message);
+          }}
+        />
       )}
 
       {toast && (

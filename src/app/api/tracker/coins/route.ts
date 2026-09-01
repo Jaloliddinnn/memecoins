@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deleteCoin, listCoins, saveCoin, updateCoinOutcome } from '@/lib/tracker/db';
+import { deleteCoin, listCoins, saveCoin, updateCoinFields } from '@/lib/tracker/db';
 import type { CoinOutcome, CoinStats } from '@/lib/tracker/types';
 
 export const runtime = 'nodejs';
@@ -70,25 +70,60 @@ export async function POST(request: Request) {
   }
 }
 
-/** Edit just the outcome label on an already-saved coin — see docs on `updateCoinOutcome`. */
+/**
+ * Edit the hand-entered fields on an already-saved coin, without re-scanning.
+ * Only the keys present in the body are touched — see `updateCoinFields`.
+ */
 export async function PATCH(request: Request) {
-  let body: { mint?: string; outcome?: string };
+  let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
-  const mint = (body.mint ?? '').trim();
+
+  const mint = String(body.mint ?? '').trim();
   if (!mint) return NextResponse.json({ error: 'mint required' }, { status: 400 });
-  const outcome = body.outcome as CoinOutcome;
-  if (!OUTCOMES.includes(outcome)) {
-    return NextResponse.json({ error: 'Invalid outcome' }, { status: 400 });
+
+  const patch: Partial<CoinStats> = {};
+
+  if ('outcome' in body) {
+    const outcome = body.outcome as CoinOutcome;
+    if (!OUTCOMES.includes(outcome)) {
+      return NextResponse.json({ error: 'Invalid outcome' }, { status: 400 });
+    }
+    patch.outcome = outcome;
+  }
+  if ('walletGroup' in body) patch.walletGroup = String(body.walletGroup ?? '').trim();
+  if ('entryPoints' in body) patch.entryPoints = String(body.entryPoints ?? '').trim();
+  if ('dipMcap' in body) patch.dipMcap = String(body.dipMcap ?? '').trim();
+  if ('notes' in body) patch.notes = String(body.notes ?? '').trim();
+
+  // Numbers are stored as numbers: a blank field means zero, not null, so the
+  // list's sorting and peak arithmetic never meet a NaN.
+  if ('maxMarketCapUsd' in body) {
+    const n = Number(body.maxMarketCapUsd);
+    if (!Number.isFinite(n) || n < 0) {
+      return NextResponse.json({ error: 'Peak market cap must be a number' }, { status: 400 });
+    }
+    patch.maxMarketCapUsd = n;
+  }
+  if ('durationMinutes' in body) {
+    const n = Number(body.durationMinutes);
+    if (!Number.isFinite(n) || n < 0) {
+      return NextResponse.json({ error: 'Duration must be a number' }, { status: 400 });
+    }
+    patch.durationMinutes = Math.round(n);
+  }
+
+  if (!Object.keys(patch).length) {
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
   }
 
   try {
-    const found = await updateCoinOutcome(mint, outcome);
+    const found = await updateCoinFields(mint, patch);
     if (!found) return NextResponse.json({ error: 'Coin not found' }, { status: 404 });
-    return NextResponse.json({ updated: mint, outcome });
+    return NextResponse.json({ updated: mint, patch });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Update failed';
     return NextResponse.json({ error: message }, { status: 500 });
