@@ -5,6 +5,19 @@ import Link from 'next/link';
 import type { CoinOutcome, CoinStats } from '@/lib/tracker/types';
 import { Sheet } from '@/components/tracker/Sheet';
 import { CoinAvatar } from '@/components/tracker/CoinAvatar';
+import {
+  entryMultiples,
+  formatEntry,
+  formatMultiple,
+  summarizeMultiples,
+} from '@/lib/tracker/entryMultiple';
+
+/** Green once it has actually multiplied, red if it never got back to entry. */
+function multipleColor(x: number): string {
+  if (x >= 2) return 'var(--green)';
+  if (x < 1) return 'var(--red)';
+  return 'var(--text)';
+}
 
 const OUTCOME_STYLE: Record<CoinOutcome, { label: string; color: string }> = {
   pumped: { label: 'Pumped', color: 'var(--green)' },
@@ -257,6 +270,8 @@ export default function CoinsPage() {
       <ul className="mt-3 grid gap-2">
         {filtered.map((c) => {
           const o = OUTCOME_STYLE[c.outcome];
+          const mults = entryMultiples(c.entryPoints, c.maxMarketCapUsd);
+          const multLabel = summarizeMultiples(mults);
           return (
             <li key={c.mint} className="glass rounded-xl px-3 py-2.5 flex flex-col gap-2">
               <div 
@@ -304,6 +319,14 @@ export default function CoinsPage() {
                     <div className="tnum text-[19px] font-bold leading-none sm:text-[22px]">
                       {money(c.maxMarketCapUsd)}
                     </div>
+                    {multLabel && mults[0] && (
+                      <div
+                        className="tnum mt-1 text-[11px] font-bold leading-none"
+                        style={{ color: multipleColor(mults[0].x) }}
+                      >
+                        {multLabel}
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col gap-1 text-right">
                     <div className="tnum text-[10.5px] font-semibold leading-none" style={{ color: 'var(--red)' }}>
@@ -412,6 +435,36 @@ export default function CoinsPage() {
                 </div>
               ))}
             </div>
+
+            {(() => {
+              const mults = entryMultiples(detailsFor.entryPoints, detailsFor.maxMarketCapUsd);
+              if (!mults.length) return null;
+              return (
+                <div className="rounded-2xl border hairline overflow-hidden">
+                  <div className="border-b hairline px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--text-dim)] bg-[var(--surface-2)]">
+                    Entry → peak
+                  </div>
+                  <ul className="divide-y divide-[var(--hairline)]">
+                    {mults.map((m) => (
+                      <li
+                        key={m.entry}
+                        className="flex items-center justify-between px-4 py-2.5"
+                      >
+                        <span className="tnum text-[13px] text-[var(--text-dim)]">
+                          {formatEntry(m.entry)} → {money(detailsFor.maxMarketCapUsd)}
+                        </span>
+                        <span
+                          className="tnum text-[16px] font-bold"
+                          style={{ color: multipleColor(m.x) }}
+                        >
+                          {formatMultiple(m.x)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
 
             <div className="rounded-2xl border hairline overflow-hidden">
               <div className="border-b hairline px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--text-dim)] bg-[var(--surface-2)]">

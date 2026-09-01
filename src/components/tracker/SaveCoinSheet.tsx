@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { CoinOutcome, ScanResult } from '@/lib/tracker/types';
 import { Sheet } from './Sheet';
+import { entryMultiples, formatEntry, formatMultiple } from '@/lib/tracker/entryMultiple';
 
 const OUTCOMES: Array<{ id: CoinOutcome; label: string; color: string }> = [
   { id: 'pumped', label: 'Pumped', color: 'var(--green)' },
@@ -116,6 +117,9 @@ export function SaveCoinSheet({
     }
   };
 
+  /** Measured against the peak field, which "Fetch peak" may have just filled. */
+  const multiples = entryMultiples(entryPoints, Number(peak) || 0);
+
   const InputLabel = ({ children }: { children: React.ReactNode }) => (
     <label className="block text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--text-dim)] mb-1.5 ml-1">
       {children}
@@ -214,6 +218,26 @@ export function SaveCoinSheet({
               placeholder="e.g. 15k, 20k"
               className="w-full rounded-xl border hairline bg-[var(--surface-2)] px-4 py-3 text-[14.5px] outline-none transition focus:border-[var(--blue)] focus:bg-[var(--surface)] placeholder:text-[var(--text-dim)]"
             />
+            {/* Live peak/entry as you type, so the multiple is visible before
+                the coin is even saved. */}
+            {multiples.length > 0 && (
+              <div className="mt-1.5 ml-1 flex flex-wrap gap-x-3 gap-y-1">
+                {multiples.map((m) => (
+                  <span key={m.entry} className="tnum text-[11px] text-[var(--text-dim)]">
+                    {formatEntry(m.entry)} →{' '}
+                    <span
+                      className="font-bold"
+                      style={{
+                        color:
+                          m.x >= 2 ? 'var(--green)' : m.x < 1 ? 'var(--red)' : 'var(--text)',
+                      }}
+                    >
+                      {formatMultiple(m.x)}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <InputLabel>Dip After Migration</InputLabel>
