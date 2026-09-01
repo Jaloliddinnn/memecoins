@@ -243,3 +243,18 @@ export async function deleteCoin(mint: string): Promise<void> {
   const sql = db();
   await sql('DELETE FROM coin_stats WHERE mint = $1', [mint]);
 }
+
+/**
+ * Targeted update for just the outcome label. Deliberately separate from
+ * `saveCoin` — that function is a full-row upsert that defaults every
+ * unspecified field to 0/null, so reusing it for a one-field edit would wipe
+ * the rest of the row's stats.
+ */
+export async function updateCoinOutcome(mint: string, outcome: CoinOutcome): Promise<boolean> {
+  const sql = db();
+  const rows = (await sql(
+    `UPDATE coin_stats SET outcome = $1, updated_at = $2 WHERE mint = $3 RETURNING mint`,
+    [outcome, Date.now(), mint]
+  )) as Array<{ mint: string }>;
+  return rows.length > 0;
+}

@@ -30,6 +30,8 @@ export function SaveCoinSheet({
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [peakBusy, setPeakBusy] = useState(false);
+  const [peakNote, setPeakNote] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/tracker/groups')
@@ -37,6 +39,35 @@ export function SaveCoinSheet({
       .then((j) => setGroups((j.groups ?? []).map((g: { label: string }) => g.label)))
       .catch(() => undefined);
   }, []);
+
+  // Neither Helius nor DexScreener expose an ATH field — this pages the
+  // pool's full swap history and takes the max implied mcap, same math the
+  // Migration Check engine uses. It's an explicit action, not automatic on
+  // open, because a busy pool's full history can take a while to page.
+  const fetchPeak = async () => {
+    setPeakBusy(true);
+    setPeakNote(null);
+    try {
+      const res = await fetch('/api/tracker/peak-mcap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mint: scan.metadata.mint }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setPeakNote(json.error ?? 'Peak scan failed');
+      } else if (json.peakMcapUsd) {
+        setPeak(String(Math.round(json.peakMcapUsd)));
+        setPeakNote(json.warnings?.[0] ?? null);
+      } else {
+        setPeakNote(json.warnings?.[0] ?? 'No priceable swaps found for this pool.');
+      }
+    } catch {
+      setPeakNote('Network error — try again.');
+    } finally {
+      setPeakBusy(false);
+    }
+  };
 
   const save = async () => {
     setBusy(true);
@@ -137,7 +168,19 @@ export function SaveCoinSheet({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <InputLabel>Peak Mcap $</InputLabel>
+            <div className="mb-1.5 ml-1 flex items-center justify-between gap-2">
+              <label className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--text-dim)]">
+                Peak Mcap $
+              </label>
+              <button
+                type="button"
+                onClick={fetchPeak}
+                disabled={peakBusy}
+                className="shrink-0 text-[10.5px] font-semibold text-[var(--blue)] disabled:opacity-50"
+              >
+                {peakBusy ? 'Scanning…' : 'Fetch peak'}
+              </button>
+            </div>
             <input
               value={peak}
               onChange={(e) => setPeak(e.target.value)}
@@ -157,6 +200,10 @@ export function SaveCoinSheet({
             />
           </div>
         </div>
+
+        {peakNote && (
+          <p className="px-1 text-[11px] leading-[1.4] text-[var(--text-dim)]">{peakNote}</p>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div>

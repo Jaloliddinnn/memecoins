@@ -37,6 +37,28 @@ export default function CoinsPage() {
     setTimeout(() => setToast((t) => (t === m ? null : t)), 3200);
   };
 
+  const updateOutcome = async (mint: string, next: CoinOutcome) => {
+    setCoins((prev) => prev.map((c) => (c.mint === mint ? { ...c, outcome: next } : c)));
+    setDetailsFor((prev) => (prev && prev.mint === mint ? { ...prev, outcome: next } : prev));
+    try {
+      const res = await fetch('/api/tracker/coins', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mint, outcome: next }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        flash(json.error ?? 'Update failed');
+        load();
+        return;
+      }
+      flash(`Marked ${OUTCOME_STYLE[next].label}`);
+    } catch {
+      flash('Network error — try again.');
+      load();
+    }
+  };
+
   const load = () => {
     setLoading(true);
     fetch('/api/tracker/coins')
@@ -307,6 +329,33 @@ export default function CoinsPage() {
           onClose={() => setDetailsFor(null)}
         >
           <div className="space-y-4">
+            <div>
+              <div className="mb-1.5 ml-1 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--text-dim)]">
+                Outcome
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {(['pumped', 'dumped', 'pump_and_dump', 'neutral'] as const).map((o) => {
+                  const style = OUTCOME_STYLE[o];
+                  const active = detailsFor.outcome === o;
+                  return (
+                    <button
+                      key={o}
+                      type="button"
+                      onClick={() => updateOutcome(detailsFor.mint, o)}
+                      className="min-h-[40px] rounded-xl text-[11.5px] font-semibold transition hover:opacity-80"
+                      style={{
+                        background: active ? `${style.color}26` : 'var(--surface-2)',
+                        color: active ? style.color : 'var(--text-dim)',
+                        border: active ? `1px solid ${style.color}40` : '1px solid transparent',
+                      }}
+                    >
+                      {o === 'pump_and_dump' ? 'P&D' : style.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {[
                 { l: 'Group', v: detailsFor.walletGroup || 'Ungrouped' },

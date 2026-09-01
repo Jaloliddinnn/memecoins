@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deleteCoin, listCoins, saveCoin } from '@/lib/tracker/db';
+import { deleteCoin, listCoins, saveCoin, updateCoinOutcome } from '@/lib/tracker/db';
 import type { CoinOutcome, CoinStats } from '@/lib/tracker/types';
 
 export const runtime = 'nodejs';
@@ -66,6 +66,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ saved: stats.mint });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Write failed';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+/** Edit just the outcome label on an already-saved coin — see docs on `updateCoinOutcome`. */
+export async function PATCH(request: Request) {
+  let body: { mint?: string; outcome?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const mint = (body.mint ?? '').trim();
+  if (!mint) return NextResponse.json({ error: 'mint required' }, { status: 400 });
+  const outcome = body.outcome as CoinOutcome;
+  if (!OUTCOMES.includes(outcome)) {
+    return NextResponse.json({ error: 'Invalid outcome' }, { status: 400 });
+  }
+
+  try {
+    const found = await updateCoinOutcome(mint, outcome);
+    if (!found) return NextResponse.json({ error: 'Coin not found' }, { status: 404 });
+    return NextResponse.json({ updated: mint, outcome });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Update failed';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
