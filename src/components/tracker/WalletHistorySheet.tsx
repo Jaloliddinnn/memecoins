@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { Sheet } from './Sheet';
+import { CoinAvatar } from './CoinAvatar';
 import type { WalletHistory } from '@/lib/tracker/walletHistory';
 import type { TagType } from '@/lib/tracker/types';
 
@@ -149,13 +150,11 @@ export function WalletHistorySheet({
                     className="flex w-full items-center gap-3 px-4 py-2.5 text-left active:bg-white/5"
                   >
                     <div className="relative shrink-0 flex items-center justify-center">
-                      {t.logoURI ? (
-                        <img src={t.logoURI} alt="" className="h-8 w-8 rounded-full object-cover bg-[var(--surface-2)]" />
-                      ) : (
-                        <div className="h-8 w-8 rounded-full bg-[var(--surface-2)] flex items-center justify-center text-[10px] font-bold text-[var(--text-dim)] uppercase">
-                          {t.symbol?.slice(0, 2) || '?'}
-                        </div>
-                      )}
+                      <CoinAvatar
+                        logoURI={t.logoURI}
+                        symbol={t.symbol}
+                        className="h-8 w-8 text-[10px]"
+                      />
                       <span
                         aria-hidden
                         className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--surface)]"

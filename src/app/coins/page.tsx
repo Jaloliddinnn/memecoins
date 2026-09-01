@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { CoinOutcome, CoinStats } from '@/lib/tracker/types';
 import { Sheet } from '@/components/tracker/Sheet';
+import { CoinAvatar } from '@/components/tracker/CoinAvatar';
 
 const OUTCOME_STYLE: Record<CoinOutcome, { label: string; color: string }> = {
   pumped: { label: 'Pumped', color: 'var(--green)' },
@@ -229,13 +230,7 @@ export default function CoinsPage() {
                 onClick={() => setDetailsFor(c)}
               >
                 <div className="flex items-center gap-3 min-w-[200px] flex-1">
-                  {c.logoURI ? (
-                    <img src={c.logoURI} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover bg-[var(--surface-2)]" />
-                  ) : (
-                    <div className="h-10 w-10 shrink-0 rounded-full bg-[var(--surface-2)] flex items-center justify-center text-[12px] font-bold text-[var(--text-dim)] uppercase">
-                      {c.symbol && c.symbol !== '???' ? c.symbol.slice(0, 2) : (c.name && c.name !== 'Unknown' ? c.name.slice(0, 2) : '?')}
-                    </div>
-                  )}
+                  <CoinAvatar logoURI={c.logoURI} symbol={c.symbol} name={c.name} />
                   <div className="min-w-0 flex flex-col justify-center">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-[14.5px] font-semibold truncate">

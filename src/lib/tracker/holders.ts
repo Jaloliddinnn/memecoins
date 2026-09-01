@@ -9,6 +9,7 @@
 import { PublicKey } from '@solana/web3.js';
 import { getConnection, heliusRpcUrl } from '@/lib/solana/connection';
 import { devProfilerService } from './devProfiler';
+import { normalizeImageUri } from './image';
 import type {
   HolderMetrics,
   TagType,
@@ -92,7 +93,7 @@ export async function getTokenMetadata(mint: string): Promise<TokenMetadata> {
         meta.liquiditySol = pair.liquidity?.quote ?? 0;
         meta.dexPoolAddress = pair.pairAddress;
         meta.dexName = pair.dexId;
-        meta.logoURI = pair.info?.imageUrl;
+        meta.logoURI = normalizeImageUri(pair.info?.imageUrl);
       }
     }
   } catch {
@@ -108,7 +109,7 @@ export async function getTokenMetadata(mint: string): Promise<TokenMetadata> {
           const pJson = await pRes.json();
           meta.name = pJson.name || meta.name;
           meta.symbol = pJson.symbol || meta.symbol;
-          meta.logoURI = pJson.image_uri || meta.logoURI;
+          meta.logoURI = normalizeImageUri(pJson.image_uri) || meta.logoURI;
         }
       } catch { /* ignore */ }
     }
@@ -131,7 +132,10 @@ export async function getTokenMetadata(mint: string): Promise<TokenMetadata> {
           const content = hJson.result?.content;
           meta.name = content?.metadata?.name || meta.name;
           meta.symbol = content?.metadata?.symbol || meta.symbol;
-          meta.logoURI = content?.links?.image || content?.files?.[0]?.uri || meta.logoURI;
+          meta.logoURI =
+            normalizeImageUri(content?.links?.image) ||
+            normalizeImageUri(content?.files?.[0]?.uri) ||
+            meta.logoURI;
         }
       } catch { /* ignore */ }
     }
