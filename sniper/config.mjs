@@ -120,18 +120,51 @@ export const RPC_URL = process.env.RPC_URL ?? '';
 export const GRPC_URL = process.env.GRPC_URL ?? '';
 export const GRPC_TOKEN = process.env.GRPC_TOKEN ?? '';
 
+/**
+ * Nozomi's 17 published tip accounts. Their docs are explicit: rotate to a
+ * random one per transaction. Every client tipping the same account write-locks
+ * it, and a write-locked tip account costs exactly the thing we are paying for.
+ * Baked in rather than typed by hand — one mistyped address is a silent miss.
+ * Source: https://use.temporal.xyz/nozomi/tipping-and-faq
+ */
+export const NOZOMI_TIP_ACCOUNTS = [
+  'TEMPaMeCRFAS9EKF53Jd6KpHxgL47uWLcpFArU1Fanq',
+  'noz3jAjPiHuBPqiSPkkugaJDkJscPuRhYnSpbi8UvC4',
+  'noz3str9KXfpKknefHji8L1mPgimezaiUyCHYMDv1GE',
+  'noz6uoYCDijhu1V7cutCpwxNiSovEwLdRHPwmgCGDNo',
+  'noz9EPNcT7WH6Sou3sr3GGjHQYVkN3DNirpbvDkv9YJ',
+  'nozc5yT15LazbLTFVZzoNZCwjh3yUtW86LoUyqsBu4L',
+  'nozFrhfnNGoyqwVuwPAW4aaGqempx4PU6g6D9CJMv7Z',
+  'nozievPk7HyK1Rqy1MPJwVQ7qQg2QoJGyP71oeDwbsu',
+  'noznbgwYnBLDHu8wcQVCEw6kDrXkPdKkydGJGNXGvL7',
+  'nozNVWs5N8mgzuD3qigrCG2UoKxZttxzZ85pvAQVrbP',
+  'nozpEGbwx4BcGp6pvEdAh1JoC2CQGZdU6HbNP1v2p6P',
+  'nozrhjhkCr3zXT3BiT4WCodYCUFeQvcdUkM7MqhKqge',
+  'nozrwQtWhEdrA6W8dkbt9gnUaMs52PdAv5byipnadq3',
+  'nozUacTVWub3cL4mJmGCYjKZTnE9RbdY5AP46iQgbPJ',
+  'nozWCyTPppJjRuw2fpzDhhWbW355fzosWSzrrMYB1Qk',
+  'nozWNju6dY353eMkMqURqwQEoM3SFgEKC6psLCSfUne',
+  'nozxNBgWohjR75vdspfxR5H9ceC7XXH99xpxhVGt3Bb',
+];
+
+/** Nozomi silently drops anything tipping under this. No error, just a miss. */
+export const NOZOMI_MIN_TIP_SOL = 0.001;
+
 export const RELAYS = [
   process.env.NOZOMI_URL && {
     name: 'nozomi',
     url: process.env.NOZOMI_URL,
-    tipAccount: process.env.NOZOMI_TIP || null,
+    // An override is honoured, but the built-in rotation is the better default.
+    tipAccounts: process.env.NOZOMI_TIP ? [process.env.NOZOMI_TIP] : NOZOMI_TIP_ACCOUNTS,
+    minTipSol: NOZOMI_MIN_TIP_SOL,
   },
   process.env.ASTRALANE_URL && {
     name: 'astralane',
     url: process.env.ASTRALANE_URL,
-    tipAccount: process.env.ASTRALANE_TIP || null,
+    tipAccounts: process.env.ASTRALANE_TIP ? [process.env.ASTRALANE_TIP] : [],
+    minTipSol: 0.00001,
   },
-  RPC_URL && { name: 'rpc', url: RPC_URL, tipAccount: null },
+  RPC_URL && { name: 'rpc', url: RPC_URL, tipAccounts: [] },
 ].filter(Boolean);
 
 export function loadWallet() {

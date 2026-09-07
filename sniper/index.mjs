@@ -451,11 +451,21 @@ async function main() {
     `, ${config.dailyStopLossSol < 0 ? `stop at ${config.dailyStopLossSol} SOL` : 'no spend limit'}`);
   log(`fees      ${perAttempt.toFixed(4)} SOL/attempt (${config.priorityFeeSol} priority + ${config.tipSol} tip) ` +
     `= ${computeUnitPrice(config.priorityFeeSol, config.computeUnitLimit).toLocaleString()} µlamports/CU`);
-  log(`relays    ${RELAYS.map((r) => r.name).join(', ')}`);
+  log(`relays    ${RELAYS.map((r) =>
+    `${r.name}${r.tipAccounts?.length > 1 ? ` (${r.tipAccounts.length} tip accounts, rotated)` : ''}`
+  ).join(', ')}`);
   log(DRY_RUN ? 'MODE      DRY RUN — nothing will be sent' : 'MODE      LIVE — real money');
 
   if (balance < config.buySol + perAttempt) {
     log(`⚠ balance is below one trade (${(config.buySol + perAttempt).toFixed(3)} SOL needed)`);
+  }
+  // An under-tipped transaction is dropped without an error, so it presents as
+  // a missed launch rather than a rejected send. Say it out loud at startup.
+  for (const relay of RELAYS) {
+    if (relay.minTipSol && config.tipSol < relay.minTipSol) {
+      log(`⚠ tip ${config.tipSol} SOL is under ${relay.name}'s ${relay.minTipSol} minimum — ` +
+        `it will drop these silently. Raise the fee.`);
+    }
   }
 
   await watchGrpc();

@@ -113,7 +113,11 @@ export async function fanOut({ payer, instructions, blockhash, config }) {
   if (!blockhash) throw new Error('No cached blockhash yet');
 
   const attempts = RELAYS.map((relay) => {
-    const tx = buildTransaction({ payer, instructions, blockhash, tipAccount: relay.tipAccount, config });
+    // Rotate the tip account per transaction. Every client hammering one
+    // account write-locks it, and relays publish a list for exactly this reason.
+    const pool = relay.tipAccounts ?? [];
+    const tipAccount = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+    const tx = buildTransaction({ payer, instructions, blockhash, tipAccount, config });
     return { relay, tx, encoded: Buffer.from(tx.serialize()).toString('base64') };
   });
 

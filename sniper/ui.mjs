@@ -204,8 +204,9 @@ const PAGE = /* html */ `<!doctype html>
 
     <label><span>7 · Max slippage %</span><input id="maxSlippagePercent" type="number"></label>
 
-    <label><span>8 · Nozomi URL — only needed to go live</span><input id="NOZOMI_URL" placeholder="a test run needs no relay"></label>
-    <label><span>Nozomi tip account</span><input id="NOZOMI_TIP" placeholder="noz..."></label>
+    <label><span>8 · Nozomi URL — only needed to go live</span>
+      <input id="NOZOMI_URL" placeholder="https://ams1.nozomi.temporal.xyz/?c=YOUR_KEY"></label>
+    <div class="hint">Tip accounts are built in and rotated per trade — nothing to paste.</div>
 
     <details id="adv"><summary>Advanced — all optional, blank = off</summary><div>
       <label><span>Feed token (blank if IP-whitelisted)</span><input id="GRPC_TOKEN"></label>
@@ -233,7 +234,7 @@ const PAGE = /* html */ `<!doctype html>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const ENV = ['PRIVATE_KEY','RPC_URL','GRPC_URL','GRPC_TOKEN','NOZOMI_URL','NOZOMI_TIP'];
+const ENV = ['PRIVATE_KEY','RPC_URL','GRPC_URL','GRPC_TOKEN','NOZOMI_URL'];
 const CFG = ['buySol','holdSeconds','minTargetSol','maxSlippagePercent','maxConcurrent','dailyStopLossSol'];
 // Optional rails. 0 is stored, but shown blank so the box reads as "off".
 const OPTIONAL = ['holdSeconds','minTargetSol','maxConcurrent','dailyStopLossSol'];
@@ -541,6 +542,11 @@ const server = http.createServer(async (req, res) => {
       warnings.push('The snipers buy about 2 SOL. With "ignore under" above 3 the bot will skip them all.');
     }
     if (!(config.targets ?? []).length) warnings.push('No target wallets — the bot has nothing to watch.');
+    // Nozomi drops an under-tipped transaction without returning an error, so
+    // this would otherwise look like the feed missing the launch entirely.
+    if (readEnv().NOZOMI_URL && (config.tipSol ?? 0) < 0.001) {
+      warnings.push(`Tip works out at ${(config.tipSol ?? 0).toFixed(5)} SOL. Nozomi silently drops anything under 0.001 — raise the fee.`);
+    }
     return json(res, 200, { ok: true, warnings });
   }
 
