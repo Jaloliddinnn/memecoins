@@ -42,8 +42,28 @@ That is the machine behind your "every coin sits at ~$80k when migrated" observa
 The group is not letting the market fill the curve — they fill it themselves, in one block,
 which pins the migration price exactly where their own last buy lands.
 
-His entry price on `4ARfNELr` worked out to 3.964e-7 SOL/token × 959.4M supply
-= **380 SOL market cap ≈ $40k at today's SOL price ($105)**.
+### Where in the stack he actually lands
+
+Reconstructed from pump.fun's bonding curve (virtual reserves 30 SOL / 1.073B tokens,
+k = 32.19e9). The "curve says" column is the model's predicted SOL cost versus what each
+wallet actually paid — it matches to within the 1% pump.fun fee on every row, and to five
+decimal places on his:
+
+| Who | Tokens bought | Market cap before → after | Paid | Curve says |
+| --- | --- | --- | --- | --- |
+| dev `7rcD2oBV` | 529,532 | $2,937 → $2,940 | 0.026 | 0.015 |
+| `CXcuLjmh` | 423,992,127 | $2,940 → **$8,042** | 19.903 | 19.624 |
+| `4vKcRQBk` | 189,923,030 | $8,042 → **$16,083** | 20.820 | 20.559 |
+| `9TsDTmH1` | 98,940,324 | $16,083 → **$26,151** | 19.559 | 19.314 |
+| `CQiyUcng` | 66,663,159 | $26,151 → **$39,406** | 20.627 | 20.369 |
+| **`HyMGBFBi`** | **5,173,311** | **$39,406 → $40,836** | **2.050** | **1.975** |
+| `GkjQ6fmQ` | 507,300 | $40,836 → $40,980 | 0.203 | 0.198 |
+
+Cumulative 785.7M of the 793.1M real reserve = **99.1%** — the curve completes and the
+coin migrates, in the creation block.
+
+**He pays 3.6% above the group's last buyer**, not a multiple of it. The four stackers
+absorb the entire ramp from $2.9k to $39.4k; he takes the last thin slice.
 
 ---
 
@@ -66,10 +86,39 @@ His entry price on `4ARfNELr` worked out to 3.964e-7 SOL/token × 959.4M supply
 Cross-checked: **zero** transactions both receive treasury funding *and* move tokens,
 so funding transfers cannot contaminate the PnL figure.
 
-### Last 20 coins
+### Last 20 coins — entry and exit market cap
 
 **20 for 20 winners, +7.09 SOL total.** One buy of 2.048–2.050 SOL each, one or two sells,
 **hold time 1 to 48 seconds** (median ~24s). Cost per round trip 0.071–0.097 SOL.
+
+He buys the same band every time and sells the same band every time:
+
+| Mint | Entry mcap | Exit mcap | Move |
+| --- | --- | --- | --- |
+| `4ARfNELrKgjT` | $41,640 | $46,314 | +11.2% |
+| `23VDjhqpAAaW` | $37,591 | $43,507 | +15.7% |
+| `7ZiuVbZ6UEvX` | $43,148 | $49,216 | +14.1% |
+| `3EKyGKhNLJwM` | $43,399 | $47,182 | +8.7% |
+| `hvbN1SERjSZb` | $41,778 | $47,256 | +13.1% |
+| `CpbDDjHydgqk` | $40,890 | $42,910 | +4.9% |
+| `EoNqEDMT6L6S` | $43,122 | $50,842 | +17.9% |
+| `4YE4BcpRu4iD` | $39,970 | $47,541 | +18.9% |
+| `AQ4adWTnA6xP` | $41,294 | $49,661 | +20.3% |
+| `8yMTZfsdZtgY` | $37,517 | $48,278 | **+28.7%** |
+| `2k9AxTjKxgHi` | $41,778 | $51,867 | +24.1% |
+| `2HBRZ6fTu31o` | $43,773 | $54,138 | +23.7% |
+| `ECJKUJtqQJ1n` | $37,697 | $45,941 | +21.9% |
+| `ABcTZWAgvW3C` | $43,849 | $50,104 | +14.3% |
+| `5MP8UfgsivXr` | $38,842 | $45,151 | +16.2% |
+| `4Nv8kfsx9p3y` | $37,665 | $46,031 | +22.2% |
+| `BYZWxeVepLGL` | $37,977 | $45,068 | +18.7% |
+| `5vJ5UpWGX62q` | $41,640 | $48,997 | +17.7% |
+| `FPcw4krUc3LT` | $42,749 | $50,770 | +18.8% |
+| `5AqNKuem4aXL` | $41,640 | $47,875 | +15.0% |
+
+**Average entry $40,898 → average exit $47,932. Median move +17.9%**, range +4.9% to
++28.7%. This is a **tight, repeatable 15–20% scalp**, not a moonshot — and not the
+20–50% it looks like from outside.
 
 ### Whole parsed window (~7 days, 216 coins)
 
@@ -197,22 +246,50 @@ Honestly: **the strategy is simple, the infrastructure is not.**
 | **Fee tolerance** | 0.045 SOL per attempt. If your hit rate is worse than his, fees eat you alive. |
 | **Running cost** | Realistically a few hundred dollars a month for the feed plus a dedicated node or a paid gRPC endpoint, before a single trade. |
 
-**What you cannot do:** replicate this from Axiom, Photon, BullX, Trojan or any bot that
-takes a contract address you paste. By the time a coin is visible in any UI, the block-0
-stack is done and the price is 8× above his fill. His 5th-place fill on `4ARfNELr` was
-already 8.5× the first buyer's price — and *you* would be arriving after all of them.
+### Why a slower entry does not work — measured, not assumed
+
+The obvious question is whether you can skip the race and enter a second or two late.
+I backtested exactly that on 15 of his coins: enter N seconds after the pool opens, hold
+for T seconds, using the **median** trade price in each window. Cells show median return
+and how many of the coins cleared +5% (roughly round-trip friction):
+
+| Entry | Median entry mcap | hold 5s | hold 10s | hold 20s | hold 30s | hold 45s |
+| --- | --- | --- | --- | --- | --- | --- |
+| **+0s (him)** | **$47,032** | +3.9% 6/13 | +5.1% 7/13 | +11.3% 6/10 | +8.3% 6/12 | +21.1% 4/8 |
+| +1s | $49,638 | +1.9% 2/14 | +2.1% 5/14 | +8.1% 6/10 | +2.8% 3/12 | +9.1% 4/8 |
+| +2s | $49,964 | −0.9% 2/15 | −0.6% 6/15 | +9.5% 6/11 | +1.3% 5/14 | +10.5% 4/7 |
+| +3s | $49,857 | +0.9% 3/14 | −0.7% 6/14 | +1.9% 4/12 | +1.1% 4/14 | +7.3% 4/8 |
+| +5s | $49,393 | +1.4% 4/14 | +1.0% 3/11 | +3.3% 5/12 | +0.9% 4/11 | +8.1% 5/7 |
+| +10s | $48,484 | +3.7% 5/12 | +4.6% 5/12 | +4.6% 6/14 | +10.4% 4/8 | +11.0% 5/8 |
+
+**His median entry is $41,778 and his median exit is $49,216.**
+
+Every delayed entry buys in at **$47,780–$49,964** — which *is his exit price*. One second
+late and you are not "slightly worse off"; you are the person he is selling to. The
+medians never clear friction reliably and the win counts sit around 2–6 out of 12–15.
+
+That is the real reason you cannot copy this, and it is a much harder wall than latency
+cost. There is no discount tier. The trade is block 0 or nothing.
+
+*(An earlier version of this note said his fill was "8.5× the first buyer's price". That
+figure compared average fill prices, and the first buyer's average is dragged down by
+buying the whole $2.9k→$8k ramp. It made his entry sound like a premium when it is 3.6%
+above the group's last buyer. The table above is the number that actually matters.)*
 
 ### The realistic version for you
 
-Do not try to race the block. Use the same *signal* on a slower timeframe:
+Do not try to race the block, and do not try to enter at +1s either — the table above
+shows that is his exit, not an entry. The usable version is on a different timeframe
+entirely:
 
-1. Watch for the 4×~20 SOL creation-block stack (you can detect it after the fact, in
-   seconds, with the tool you already have).
+1. Detect the 4×~20 SOL creation-block stack after the fact (seconds, with the tool you
+   already have). It is an unambiguous fingerprint.
 2. That stack is what forces the curve to complete and pins migration at ~$40k.
-3. Your entry is then the retention rule you have already backtested — not the snipe.
+3. Treat it as a **group identifier**, not an entry trigger — then apply the retention
+   rule you already backtested, on the timeframe you already trade.
 
-You will not get his 12.9% per trade. But the signal is the same signal, and you would be
-detecting a group that is currently **not in your database at all** (see below).
+You will not get his 12.9% per trade, and you should not expect to. What you get is early
+identification of a group that is currently **not in your database at all** (see below).
 
 ### One thing to steal outright
 
