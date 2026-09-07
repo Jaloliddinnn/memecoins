@@ -145,6 +145,49 @@ himself and worsens his own fill. The 2 SOL size is not modesty — it is the ed
 
 ---
 
+## 2b. Worked example — ANONWIFHAT, `AK5CZgxC1tKf1TstBqMkUaQp1LnScPBrRFBA7WNrpump`
+
+The whole life of one coin, 2026-09-07. 19,793 signatures, **3,670 of them failed (18.5%)**.
+
+| Time | Event | Market cap |
+| --- | --- | --- |
+| 11:02:52 (+0s) | Coin created | $2,940 |
+| +0s | Stack fills: **19.90 → 20.82 → 19.56 → 20.63 SOL** | $4,932 → **$43,450** |
+| **+0s** | **He buys 2.048 SOL** | **$43,450** |
+| +0s | LP seeded on PumpSwap — **84.99 SOL** | — |
+| +1s | Retail arrives | $48,287 |
+| **+15s** | **He sells 2.482 SOL — done, +21.2%** | **$52,651** |
+| ~+12 min | Peak | **~$113,000** |
+| +14 to +17 min | Collapse | $46,334 → **$2,368** |
+| now | | **~$2,090** |
+
+Three things this pins down:
+
+1. **The 84.99 SOL LP seed is the same constant** documented in the JINPACHI dossier
+   (84.99 SOL + 206,900,000 tokens). It is not group-specific — it is how PumpSwap opens.
+2. **+21.2% is the top of his range**, not the middle. The 20-coin median is +17.9%.
+3. **Holding past his exit would have made 2.6×** ($43k → $113k) — and then given all of it
+   back and more. The coin ended at 5% of his entry. His 15-second exit is not timidity;
+   it is the only part of this trade that is reliably repeatable.
+
+### He is not the only one doing it
+
+Across 16 of his coins, these wallets also coat-tail the stack with a 1–6 SOL block-0 buy:
+
+| Wallet | Coins | Size | Recent failure rate |
+| --- | --- | --- | --- |
+| **`HyMGBFBi1H9v…`** (his) | **13 / 16** | always 2.05 | 25% |
+| `5hQ38HKkARAe8mgsk4Fh1wrmKM1gPkyTxvaneP2oPb5c` | 6 | 1.25–1.29 | 59% |
+| `41Lur83aijfobxhaVuAMMCnnkqCJkYY9RZ4ucwkaC3od` | 4 | 2.06 | **0% — 28 txs, zero fails** |
+| `ATQfqM1KjEv3hMhRX3NUaCa5V9sYgC2gk6YJKNr4R3uq` | 3 | 1.51–5.46 | — |
+| `FEUa5TK22AyRyyjKpd2bCx7se1Eczmt7AFxdS6dUfHz4` | 2 | 1.12–2.35 | **92%** |
+
+Failure rate is the tell. `FEUa5TK…Hz4` burns 916 of every 1,000 attempts; your wallet
+burns 25%; `41Lur83…C3od` has missed nothing in 28 transactions but only fires four times
+in 16 coins. These are the same strategy at very different levels of execution quality —
+and they are a better watchlist than the scam group itself, because **they only fire when
+the stack is real**.
+
 ## 3. The stack he runs
 
 ### His own on-chain program
