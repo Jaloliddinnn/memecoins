@@ -20,6 +20,8 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Keypair, Connection } from '@solana/web3.js';
 import bs58 from 'bs58';
+import * as bip39 from 'bip39';
+import { derivePath } from 'ed25519-hd-key';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENV_PATH = path.join(HERE, '.env');
@@ -154,6 +156,13 @@ const PAGE = /* html */ `<!doctype html>
   details summary::before{content:"▸ ";}
   details[open] summary::before{content:"▾ ";}
   details>div{display:flex;flex-direction:column;gap:11px;padding-top:11px}
+  .acct{display:flex;align-items:center;gap:10px;background:var(--s2);border-radius:10px;
+        padding:9px 11px;cursor:pointer;border:1px solid transparent}
+  .acct:hover{border-color:var(--blue)}
+  .acct.on{border-color:var(--green)}
+  .acct .a{font-family:ui-monospace,Menlo,monospace;font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis}
+  .acct .b{font-size:11.5px;font-variant-numeric:tabular-nums}
+  .acct .l{font-size:10px;color:var(--dim)}
   #log{flex:1;min-height:0;background:#000;border-radius:12px;padding:12px;overflow:auto;
        font:11.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
   @media(max-width:900px){main{grid-template-columns:1fr}}
@@ -172,9 +181,10 @@ const PAGE = /* html */ `<!doctype html>
 
 <main>
   <div class="col">
-    <label><span>1 · Your wallet (burner)</span>
-      <input id="PRIVATE_KEY" type="password" placeholder="paste a private key, or generate one"></label>
-    <button class="ghost" id="gen">Generate a new wallet</button>
+    <label><span>1 · Your wallet</span>
+      <input id="PRIVATE_KEY" type="password" placeholder="private key, or 12/24-word seed phrase"></label>
+    <div id="accounts"></div>
+    <button class="ghost" id="gen">Generate a new wallet instead</button>
 
     <label><span>2 · Feed URL</span><input id="GRPC_URL" placeholder="http://84.32.104.38:10001"></label>
     <label><span>3 · RPC URL</span><input id="RPC_URL" placeholder="https://mainnet.helius-rpc.com/?api-key=..."></label>
@@ -251,6 +261,8 @@ async function load(){
 
 async function save(){
   const env = {}; for (const k of ENV) env[k] = $(k).value.trim();
+  // A pasted seed phrase is not itself a key — send the derived one the user picked.
+  if ($('PRIVATE_KEY').dataset.secret) env.PRIVATE_KEY = $('PRIVATE_KEY').dataset.secret;
   const config = { targets: $('targets').value.split(/[\\s,]+/).filter(Boolean) };
   for (const k of CFG) config[k] = Number($(k).value);
   const fee = +$('feeTotal').value || 0;
@@ -264,9 +276,49 @@ async function save(){
 }
 
 $('save').onclick = save;
+let resolveTimer = null;
+$('PRIVATE_KEY').addEventListener('input', () => {
+  clearTimeout(resolveTimer);
+  resolveTimer = setTimeout(resolveWallet, 400);
+});
+
+async function resolveWallet(){
+  const input = $('PRIVATE_KEY').value.trim();
+  const box = $('accounts');
+  if (!input) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="hint">Checking…</div>';
+  const d = await (await fetch('/api/resolve', {method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({input})})).json();
+
+  if (d.kind === 'invalid') { box.innerHTML = '<div class="msg err">' + d.reason + '</div>'; return; }
+  if (d.kind === 'key') {
+    box.innerHTML = '<div class="msg ok">Wallet ' + d.accounts[0].address + '</div>';
+    return;
+  }
+  // A seed phrase is a tree of wallets — show them with balances and let the
+  // user pick, because only they know which one they mean.
+  box.innerHTML = '<div class="hint">Seed phrase — pick the wallet you mean:</div>' +
+    d.accounts.map((a, i) =>
+      '<div class="acct" data-secret="' + a.secret + '" style="margin-top:6px">' +
+        '<span class="a">' + a.address.slice(0,10) + '…' + a.address.slice(-6) +
+          '<br><span class="l">' + a.label + '</span></span>' +
+        '<span class="b">' + (a.balance == null ? '' : a.balance.toFixed(3) + ' SOL') + '</span>' +
+      '</div>').join('');
+  box.querySelectorAll('.acct').forEach((el) => {
+    el.onclick = () => {
+      box.querySelectorAll('.acct').forEach(x => x.classList.remove('on'));
+      el.classList.add('on');
+      $('PRIVATE_KEY').dataset.secret = el.dataset.secret;
+      say('ok', 'Selected. Press Save.');
+    };
+  });
+}
+
 $('gen').onclick = async () => {
   const d = await (await fetch('/api/generate', {method:'POST'})).json();
   $('PRIVATE_KEY').value = d.secret;
+  delete $('PRIVATE_KEY').dataset.secret;
+  $('accounts').innerHTML = '';
   say('ok', 'New wallet ' + d.address + ' — send SOL there before going live, then Save.');
 };
 $('useSnipers').onclick = () => { $('targets').value = SNIPERS.join('\\n'); };
@@ -312,6 +364,68 @@ async function readBody(req) {
   }
 }
 
+/**
+ * Turn whatever the user pasted into candidate wallets.
+ *
+ * Three things get called "your private key" in the wild and people paste all
+ * of them: a base58 secret key (Phantom's "export private key"), a JSON byte
+ * array (Solana CLI's id.json), and a seed phrase. A seed phrase is not one
+ * wallet but a tree of them, and which branch holds the money depends on the
+ * app that made it — so we derive the common paths and let the balances say
+ * which is the right one, rather than guessing.
+ */
+const DERIVATIONS = [
+  { path: "m/44'/501'/0'/0'", label: 'Phantom / Solflare, account 1' },
+  { path: "m/44'/501'/1'/0'", label: 'account 2' },
+  { path: "m/44'/501'/2'/0'", label: 'account 3' },
+  { path: "m/44'/501'/0'", label: 'Solana CLI style' },
+];
+
+async function resolveWallet(input, rpcUrl) {
+  const text = (input ?? '').trim();
+  if (!text) return { kind: 'empty', accounts: [] };
+
+  const single = walletFrom(text);
+  if (single) {
+    return {
+      kind: 'key',
+      accounts: [{ label: 'Imported key', address: single.publicKey.toBase58(), secret: bs58.encode(single.secretKey) }],
+    };
+  }
+
+  const words = text.toLowerCase().split(/\s+/).filter(Boolean);
+  if ([12, 15, 18, 21, 24].includes(words.length)) {
+    const phrase = words.join(' ');
+    if (!bip39.validateMnemonic(phrase)) {
+      return { kind: 'invalid', reason: 'That looks like a seed phrase, but one of the words is not in the wordlist.' };
+    }
+    const seed = bip39.mnemonicToSeedSync(phrase, '');
+    const accounts = [];
+    for (const { path, label } of DERIVATIONS) {
+      const kp = Keypair.fromSeed(derivePath(path, seed.toString('hex')).key);
+      accounts.push({ label, path, address: kp.publicKey.toBase58(), secret: bs58.encode(kp.secretKey) });
+    }
+    const root = Keypair.fromSeed(seed.subarray(0, 32));
+    accounts.push({ label: 'no derivation', address: root.publicKey.toBase58(), secret: bs58.encode(root.secretKey) });
+
+    if (rpcUrl) {
+      const conn = new Connection(rpcUrl, 'confirmed');
+      await Promise.all(
+        accounts.map(async (a) => {
+          a.balance = await conn.getBalance(Keypair.fromSecretKey(bs58.decode(a.secret)).publicKey)
+            .then((b) => b / 1e9).catch(() => null);
+        })
+      );
+    }
+    return { kind: 'mnemonic', accounts };
+  }
+
+  return {
+    kind: 'invalid',
+    reason: 'Not a private key or a seed phrase. Paste a base58 key, a [1,2,3,...] array, or 12/24 words.',
+  };
+}
+
 function walletFrom(secret) {
   if (!secret) return null;
   try {
@@ -344,6 +458,15 @@ const server = http.createServer(async (req, res) => {
       env, config: readConfig(), running: Boolean(child), mode,
       wallet: kp ? kp.publicKey.toBase58() : null, balance,
     });
+  }
+
+  if (url.pathname === '/api/resolve' && req.method === 'POST') {
+    const body = await readBody(req);
+    try {
+      return json(res, 200, await resolveWallet(body.input, readEnv().RPC_URL));
+    } catch (err) {
+      return json(res, 200, { kind: 'invalid', reason: err.message });
+    }
   }
 
   if (url.pathname === '/api/generate' && req.method === 'POST') {
