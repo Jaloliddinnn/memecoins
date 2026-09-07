@@ -200,6 +200,55 @@ and read the delta. That is a far better first purchase than a month of anything
 | Helius LaserStream | **$499/mo** — note: *not* Yellowstone-compatible, own SDK and wire format |
 | Dedicated gRPC node | **$1,800–2,200/mo** |
 
+### Astralane — both halves, and the shred feed has no subscription
+
+*Added 2026-09-07. This is the cheapest viable path found so far.*
+
+Astralane sells the two things this bot needs, and the pricing model is unusual enough to
+change the plan.
+
+**Iris (the sender).** Plain JSON-RPC `sendTransaction`, base64, API key as a query
+parameter — a drop-in for `send.mjs` as already written. Claims 0–1 p90 slot latency via
+validator co-location and leader-schedule awareness. **Minimum tip 10,000 lamports
+(0.00001 SOL)**, purely anti-spam; you will bid far above it. Endpoints in 11 regions:
+
+```
+https://edge.astralane.io/iris?api-key=KEY       global edge
+http://fr.gateway.astralane.io/iris?api-key=KEY   Frankfurt (recommended)
+http://ams.gateway.astralane.io/iris?api-key=KEY  Amsterdam (recommended)
+http://ny.gateway.astralane.io/iris?api-key=KEY   New York
+```
+
+Tip accounts are **region-specific** — use the one your endpoint's docs list. Four seen
+live on-chain in the target's own transactions: `astrazznxs…`, `astra4uejeP…`,
+`astraRVUuTHjpw…`, `astra9xWY93…`.
+
+API key: create an account on their portal, then ask in their Discord.
+
+**Shreds — billed in tips, not dollars.** Parsed shreds straight from the block leader,
+about **200ms ahead of Geyser-based feeds**, with no RPC node needed. Access is a tier
+earned by trading, not a subscription:
+
+| Tier | Requirement (rolling 24h) | For |
+| --- | --- | --- |
+| Tier-1 | **0.2 SOL** of registered tips | development / testing |
+| Tier-2 | **0.5 SOL** of registered tips | production, ultra-low-latency |
+
+A tip only counts once a copy of the transaction is POSTed to their ShredPay HTTP
+endpoint. 24-hour grace period before a downgrade.
+
+**At a 0.055 SOL tip, Tier-1 is about 4 trades a day and Tier-2 about 10.** The target
+makes 77 buys a day. So the pre-block feed — the thing §2 says the entire business turns
+on — costs **nothing beyond tips you were already paying**, provided you are actually
+trading. That removes the $500–1,000/mo blocker.
+
+**The catch, and it is a real one.** Astralane's shreds are **raw UDP, not gRPC, and not
+Yellowstone-compatible**. There is no account filter — it is a firehose you filter
+locally, and you reconstruct entries yourself (`Shred::new_from_serialized_shred`, FEC
+recovery, then deserialise). Two regions only: Frankfurt and New York. So this bot's gRPC
+path does not point at it; a UDP shred adapter is a genuine piece of work, and your VPS
+needs to be in Frankfurt or New York for it to be worth having.
+
 ### Transaction submission relays
 
 | Relay | Notes |

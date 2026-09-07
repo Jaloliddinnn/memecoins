@@ -118,12 +118,19 @@ console.log('  Chainstack from $49/mo, rpc edge from $249, Shyft from $199.\n');
 const grpcUrl = await ask('  gRPC URL', envValue('GRPC_URL'));
 const grpcToken = await ask('  gRPC token (blank if none)', envValue('GRPC_TOKEN'));
 
-console.log('\n  Relays — the express lanes to the validator. Get the CURRENT tip');
-console.log('  accounts from each provider; they change.\n');
+console.log('\n  Relays — the express lanes to the validator.');
+console.log('  Astralane (Iris) is plain JSON-RPC sendTransaction, so it drops straight in.');
+console.log('  Minimum tip is 10,000 lamports; tip accounts are REGION-SPECIFIC.');
+console.log('    https://edge.astralane.io/iris?api-key=KEY       global edge');
+console.log('    http://fr.gateway.astralane.io/iris?api-key=KEY   Frankfurt');
+console.log('    http://ams.gateway.astralane.io/iris?api-key=KEY  Amsterdam');
+console.log('    http://ny.gateway.astralane.io/iris?api-key=KEY   New York\n');
+const astraUrl = await ask('  Astralane URL (blank to skip)', envValue('ASTRALANE_URL'));
+const astraTip = astraUrl
+  ? await ask('  Astralane tip account for that region', envValue('ASTRALANE_TIP'))
+  : '';
 const nozomiUrl = await ask('  Nozomi URL (blank to skip)', envValue('NOZOMI_URL'));
 const nozomiTip = nozomiUrl ? await ask('  Nozomi tip account', envValue('NOZOMI_TIP')) : '';
-const astraUrl = await ask('  Astralane URL (blank to skip)', envValue('ASTRALANE_URL'));
-const astraTip = astraUrl ? await ask('  Astralane tip account', envValue('ASTRALANE_TIP')) : '';
 
 // ---------------------------------------------------------------------------
 // 3. Trading
