@@ -129,3 +129,27 @@ with `EBUSY` trying to remove the mounted `node_modules/.cache` volume.
 - **Wallet history and top traders are capped** at a bounded number of parsed
   transactions and report `truncated: true` when they hit it, rather than
   looping through thousands of signatures.
+
+## Profiling a single trader
+
+`scripts/analyze-trader.mjs` rebuilds one wallet's last N traded coins from
+Helius enhanced transactions and reports what the app's wallet view does not:
+the cost side and the plumbing.
+
+```bash
+HELIUS_API_KEY=... npm run analyze:trader -- <wallet> --coins 20 --pages 30
+```
+
+It prints (and writes `trader-<prefix>.md` / `.json`):
+
+- per coin — entry size, buy/sell leg counts, hold time, SOL in/out, PnL, and
+  the fees that trade cost: base+priority fee, the priority component decoded
+  from the tx's own ComputeBudget instructions, Jito tips, and any small
+  outbound transfer to a third party (a terminal's fee cut)
+- strategy shape — median entry size, ladder depth, median hold, hit rate
+- last 24h — swap count, gross flow, net native SOL delta, cost per swap
+- the program IDs and Helius `source` tags behind the swaps, and the wallets
+  that take a cut, which is what actually identifies the bot or terminal
+
+`HELIUS_TX_BASE` overrides the API host so the pipeline can be run against a
+local mock.
