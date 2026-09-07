@@ -114,124 +114,120 @@ function stopBot() {
 
 const PAGE = /* html */ `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sniper control panel</title>
+<title>Sniper</title>
 <style>
-  :root{--bg:#0a0a0c;--surface:#141417;--surface2:#1c1c20;--text:#f5f5f7;--dim:#8e8e93;
-        --blue:#0a84ff;--green:#30d158;--red:#ff453a;--amber:#ff9f0a;--line:rgba(255,255,255,.09)}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);
-       font:15px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
-  .wrap{max-width:760px;margin:0 auto;padding:24px 18px 80px}
-  h1{font-size:30px;letter-spacing:-.02em;margin:0 0 2px}
-  .sub{color:var(--dim);font-size:13px;margin-bottom:22px}
-  h2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin:26px 0 8px}
-  label{display:block;margin-bottom:12px}
-  label>span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin-bottom:5px}
-  input,textarea{width:100%;background:var(--surface2);border:0;border-radius:11px;padding:12px 13px;
-       color:var(--text);font:15px/1.4 inherit;outline:none}
+  :root{--bg:#0a0a0c;--s1:#141417;--s2:#1c1c20;--tx:#f5f5f7;--dim:#8e8e93;
+        --blue:#0a84ff;--green:#30d158;--red:#ff453a;--amber:#ff9f0a;--line:rgba(255,255,255,.08)}
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%;overflow:hidden}
+  body{background:var(--bg);color:var(--tx);
+       font:13px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+       display:flex;flex-direction:column}
+
+  header{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--line);flex:none}
+  header h1{font-size:17px;letter-spacing:-.01em}
+  .pill{display:flex;align-items:center;gap:6px;background:var(--s2);border-radius:999px;padding:5px 11px;font-size:11.5px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--dim);flex:none}
+  .wl{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--dim);
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px}
+  .spacer{flex:1}
+  button{border:0;border-radius:9px;padding:8px 14px;font:600 12.5px inherit;cursor:pointer;color:#fff;white-space:nowrap}
+  .go{background:var(--green);color:#04210d}.primary{background:var(--blue)}
+  .stop{background:var(--red)}.ghost{background:var(--s2);color:var(--tx)}
+  button:disabled{opacity:.4;cursor:default}
+
+  main{flex:1;display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:12px;padding:12px 16px;min-height:0}
+  .col{display:flex;flex-direction:column;gap:9px;min-height:0;overflow:auto}
+  .col::-webkit-scrollbar{width:0}
+  h2{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);margin-top:2px}
+  label{display:block}
+  label>span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);margin-bottom:3px}
+  input,textarea{width:100%;background:var(--s2);border:0;border-radius:9px;padding:8px 10px;
+       color:var(--tx);font:13px/1.3 inherit;outline:none}
   input:focus,textarea:focus{box-shadow:0 0 0 2px var(--blue) inset}
-  textarea{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;min-height:86px;resize:vertical}
-  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .hint{font-size:11.5px;color:var(--dim);margin:-7px 0 12px;line-height:1.45}
-  button{border:0;border-radius:13px;padding:14px 18px;font:600 15px inherit;cursor:pointer;color:#fff}
-  .primary{background:var(--blue)} .go{background:var(--green);color:#04210d}
-  .stop{background:var(--red)} .ghost{background:var(--surface2);color:var(--text)}
-  button:disabled{opacity:.45;cursor:default}
-  .bar{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-  .card{background:var(--surface);border-radius:16px;padding:14px 15px;margin-top:12px}
-  .warn{background:rgba(255,159,10,.12);color:var(--amber);border-radius:12px;padding:11px 13px;font-size:12.5px;line-height:1.5;margin-top:12px}
-  .ok{background:rgba(48,209,88,.12);color:var(--green);border-radius:12px;padding:11px 13px;font-size:12.5px;margin-top:12px}
-  .err{background:rgba(255,69,58,.12);color:var(--red);border-radius:12px;padding:11px 13px;font-size:12.5px;margin-top:12px}
-  #log{background:#000;border-radius:14px;padding:13px;height:340px;overflow:auto;
-       font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
-  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:middle}
-  .mono{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--dim);word-break:break-all}
-  @media(max-width:520px){.row{grid-template-columns:1fr}}
-</style></head><body><div class="wrap">
+  textarea{font-family:ui-monospace,Menlo,monospace;font-size:11px;resize:none;height:66px}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .hint{font-size:10.5px;color:var(--dim);line-height:1.4}
+  .msg{border-radius:9px;padding:8px 10px;font-size:11.5px;line-height:1.45}
+  .warn{background:rgba(255,159,10,.13);color:var(--amber)}
+  .ok{background:rgba(48,209,88,.13);color:var(--green)}
+  .err{background:rgba(255,69,58,.13);color:var(--red)}
+  #log{flex:1;min-height:0;background:#000;border-radius:11px;padding:10px;overflow:auto;
+       font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
+  @media(max-width:1100px){main{grid-template-columns:1fr 1fr}#logCol{grid-column:1/-1}}
+</style></head><body>
 
-<h1>Sniper</h1>
-<div class="sub">Local control panel — this page is only reachable from this computer.</div>
+<header>
+  <h1>Sniper</h1>
+  <div class="pill"><span class="dot" id="dot"></span><b id="state">Stopped</b></div>
+  <div class="wl" id="walletLine">No wallet</div>
+  <div class="spacer"></div>
+  <button class="go" id="startDry">Test run</button>
+  <button class="primary" id="startLive">Go live</button>
+  <button class="stop" id="stop" disabled>Stop</button>
+  <button class="ghost" id="save">Save</button>
+</header>
 
-<div class="card">
-  <div><span class="dot" id="dot" style="background:var(--dim)"></span><b id="state">Stopped</b></div>
-  <div class="mono" id="walletLine" style="margin-top:6px"></div>
-  <div class="bar">
-    <button class="go" id="startDry">Start test run</button>
-    <button class="primary" id="startLive">Start for real</button>
-    <button class="stop" id="stop" disabled>Stop</button>
+<main>
+  <div class="col">
+    <h2>Wallet</h2>
+    <label><span>Private key (burner)</span><input id="PRIVATE_KEY" type="password" placeholder="paste, or generate"></label>
+    <button class="ghost" id="gen">Generate a new wallet</button>
+    <div class="hint">Never leaves this computer.</div>
+
+    <h2>Feed — the eyes</h2>
+    <label><span>gRPC URL</span><input id="GRPC_URL" placeholder="http://84.32.104.38:10001"></label>
+    <div class="hint"><b>http://</b> for IP-whitelisted (AllenHark), <b>https://</b> for token feeds.</div>
+    <label><span>gRPC token</span><input id="GRPC_TOKEN" placeholder="blank if IP-whitelisted"></label>
+    <label><span>RPC URL</span><input id="RPC_URL" placeholder="https://mainnet.helius-rpc.com/?api-key=..."></label>
+    <div id="msg"></div>
   </div>
-  <div class="hint" style="margin:10px 0 0">A test run builds and signs everything but sends nothing. Do that first.</div>
-</div>
 
-<h2>Wallet</h2>
-<label><span>Private key of a burner wallet</span>
-  <input id="PRIVATE_KEY" type="password" placeholder="paste, or press Generate"></label>
-<div class="bar" style="margin:-4px 0 6px"><button class="ghost" id="gen">Generate a new wallet</button></div>
-<div class="hint">Never leaves this computer. Fund it with only what you can lose.</div>
+  <div class="col">
+    <h2>Relays — the legs</h2>
+    <label><span>Astralane URL</span><input id="ASTRALANE_URL" placeholder="http://ams.gateway.astralane.io/iris?api-key=..."></label>
+    <label><span>Astralane tip account</span><input id="ASTRALANE_TIP" placeholder="astra..."></label>
+    <label><span>Nozomi URL</span><input id="NOZOMI_URL"></label>
+    <label><span>Nozomi tip account</span><input id="NOZOMI_TIP" placeholder="noz..."></label>
 
-<h2>Feed &amp; endpoints</h2>
-<label><span>gRPC URL — the eyes</span><input id="GRPC_URL" placeholder="http://84.32.104.38:10001"></label>
-<div class="hint">Use <b>http://</b> for IP-whitelisted feeds like AllenHark, <b>https://</b> for token ones. Join the host and port from their console.</div>
-<label><span>gRPC token (blank for IP-whitelisted)</span><input id="GRPC_TOKEN" placeholder="leave empty"></label>
-<label><span>RPC URL</span><input id="RPC_URL" placeholder="https://mainnet.helius-rpc.com/?api-key=..."></label>
+    <h2>Targets</h2>
+    <label><textarea id="targets" placeholder="one wallet per line"></textarea></label>
+    <button class="ghost" id="useSnipers">Use the known snipers</button>
+    <div class="hint">The scammers&rsquo; ~20 SOL wallets change every coin. The snipers do not, and buy in the same block.</div>
+  </div>
 
-<h2>Relays — the legs (optional for a test run)</h2>
-<div class="row">
-  <label><span>Astralane URL</span><input id="ASTRALANE_URL" placeholder="http://ams.gateway.astralane.io/iris?api-key=..."></label>
-  <label><span>Astralane tip account</span><input id="ASTRALANE_TIP" placeholder="astra..."></label>
-  <label><span>Nozomi URL</span><input id="NOZOMI_URL"></label>
-  <label><span>Nozomi tip account</span><input id="NOZOMI_TIP"></label>
-</div>
+  <div class="col" id="logCol">
+    <h2>Trade</h2>
+    <div class="g2">
+      <label><span>SOL per trade</span><input id="buySol" type="number" step="0.1"></label>
+      <label><span>Hold seconds</span><input id="holdSeconds" type="number"></label>
+      <label><span>Priority fee</span><input id="priorityFeeSol" type="number" step="0.001"></label>
+      <label><span>Tip per relay</span><input id="tipSol" type="number" step="0.001"></label>
+      <label><span>Ignore buys under</span><input id="minTargetSol" type="number" step="0.5"></label>
+      <label><span>Max slippage %</span><input id="maxSlippagePercent" type="number"></label>
+      <label><span>Max open</span><input id="maxConcurrent" type="number"></label>
+      <label><span>Daily stop (SOL)</span><input id="dailyStopLossSol" type="number"></label>
+    </div>
+    <div class="hint" id="feeNote"></div>
+    <h2>Live log</h2>
+    <div id="log"></div>
+  </div>
+</main>
 
-<h2>Targets</h2>
-<label><span>Wallets to copy — one per line</span><textarea id="targets"></textarea></label>
-<div class="hint">The scammers' ~20 SOL wallets now change every coin, so they go stale within hours. The snipers do not change — copying them puts you in the same block.</div>
-<div class="bar" style="margin:-4px 0 0"><button class="ghost" id="useSnipers">Use the known snipers</button></div>
-
-<h2>Trade</h2>
-<div class="row">
-  <label><span>SOL per trade</span><input id="buySol" type="number" step="0.1"></label>
-  <label><span>Hold seconds</span><input id="holdSeconds" type="number"></label>
-  <label><span>Priority fee (SOL)</span><input id="priorityFeeSol" type="number" step="0.001"></label>
-  <label><span>Tip per relay (SOL)</span><input id="tipSol" type="number" step="0.001"></label>
-  <label><span>Ignore target buys under (SOL)</span><input id="minTargetSol" type="number" step="0.5"></label>
-  <label><span>Max slippage (%)</span><input id="maxSlippagePercent" type="number"></label>
-  <label><span>Max open positions</span><input id="maxConcurrent" type="number"></label>
-  <label><span>Daily stop loss (SOL)</span><input id="dailyStopLossSol" type="number"></label>
-</div>
-<div id="feeNote" class="hint"></div>
-
-<div class="bar"><button class="primary" id="save">Save settings</button></div>
-<div id="msg"></div>
-
-<h2>Live log</h2>
-<div id="log"></div>
-
-</div><script>
+<script>
 const $ = (id) => document.getElementById(id);
 const ENV = ['PRIVATE_KEY','RPC_URL','GRPC_URL','GRPC_TOKEN','ASTRALANE_URL','ASTRALANE_TIP','NOZOMI_URL','NOZOMI_TIP'];
 const CFG = ['buySol','holdSeconds','priorityFeeSol','tipSol','minTargetSol','maxSlippagePercent','maxConcurrent','dailyStopLossSol'];
 const SNIPERS = ['HyMGBFBi1H9vZcSHoevPcvkAmHiKxspAYjfnJhiz7JZd','FEUa5TK22AyRyyjKpd2bCx7se1Eczmt7AFxdS6dUfHz4'];
 
-function say(kind, text){ $('msg').innerHTML = '<div class="'+kind+'">'+text+'</div>'; }
+const say = (kind, text) => { $('msg').innerHTML = '<div class="msg ' + kind + '">' + text + '</div>'; };
 
 function feeNote(){
   const per = (+$('priorityFeeSol').value||0) + (+$('tipSol').value||0);
   const size = +$('buySol').value||0;
   const pct = size ? (per/size*100).toFixed(1) : '0';
-  let verdict = per > 0.101 ? 'above every sniper measured on these coins.'
-    : 'below the 0.101 SOL that buys a 0% failure rate.';
-  $('feeNote').textContent = per.toFixed(4)+' SOL per attempt — '+pct+'% of the position, '+verdict;
-}
-
-async function load(){
-  const r = await fetch('/api/state'); const d = await r.json();
-  for (const k of ENV) $(k).value = d.env[k] || '';
-  for (const k of CFG) $(k).value = d.config[k];
-  $('targets').value = (d.config.targets||[]).join('\\n');
-  $('walletLine').textContent = d.wallet ? 'Wallet ' + d.wallet + '  ·  ' + d.balance.toFixed(4) + ' SOL' : 'No wallet set yet';
-  feeNote();
-  paint(d);
+  $('feeNote').textContent = per.toFixed(4) + ' SOL per attempt — ' + pct + '% of the position, ' +
+    (per > 0.101 ? 'above every sniper measured on these coins.' : 'below the 0.101 that buys a 0% failure rate.');
 }
 
 function paint(d){
@@ -241,35 +237,44 @@ function paint(d){
   $('stop').disabled = !on; $('startDry').disabled = on; $('startLive').disabled = on;
 }
 
+async function load(){
+  const d = await (await fetch('/api/state')).json();
+  for (const k of ENV) $(k).value = d.env[k] || '';
+  for (const k of CFG) $(k).value = d.config[k];
+  $('targets').value = (d.config.targets||[]).join('\\n');
+  $('walletLine').textContent = d.wallet ? d.wallet + '  ·  ' + d.balance.toFixed(3) + ' SOL' : 'No wallet';
+  feeNote(); paint(d);
+}
+
 async function save(){
   const env = {}; for (const k of ENV) env[k] = $(k).value.trim();
   const config = { targets: $('targets').value.split(/[\\s,]+/).filter(Boolean) };
   for (const k of CFG) config[k] = Number($(k).value);
-  const r = await fetch('/api/save', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({env,config})});
-  const d = await r.json();
-  if (d.error) return say('err', d.error);
-  say(d.warnings && d.warnings.length ? 'warn' : 'ok', d.warnings && d.warnings.length ? d.warnings.join(' ') : 'Saved.');
-  load();
+  const d = await (await fetch('/api/save', {method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({env,config})})).json();
+  if (d.error) { say('err', d.error); return false; }
+  say(d.warnings.length ? 'warn' : 'ok', d.warnings.length ? d.warnings.join(' ') : 'Saved.');
+  load(); return true;
 }
 
 $('save').onclick = save;
 $('gen').onclick = async () => {
-  const r = await fetch('/api/generate', {method:'POST'}); const d = await r.json();
+  const d = await (await fetch('/api/generate', {method:'POST'})).json();
   $('PRIVATE_KEY').value = d.secret;
-  say('ok', 'New wallet ' + d.address + ' — send SOL there before running for real. Press Save.');
+  say('ok', 'New wallet ' + d.address + ' — send SOL there before going live, then Save.');
 };
 $('useSnipers').onclick = () => { $('targets').value = SNIPERS.join('\\n'); };
-$('startDry').onclick = async () => { await save(); await fetch('/api/start?dry=1',{method:'POST'}); };
+$('startDry').onclick = async () => { if (await save()) fetch('/api/start?dry=1',{method:'POST'}); };
 $('startLive').onclick = async () => {
   if (!confirm('This spends real SOL on every fire. Continue?')) return;
-  await save(); await fetch('/api/start',{method:'POST'});
+  if (await save()) fetch('/api/start',{method:'POST'});
 };
 $('stop').onclick = () => fetch('/api/stop',{method:'POST'});
 for (const k of ['priorityFeeSol','tipSol','buySol']) $(k).addEventListener('input', feeNote);
 
 let seen = 0;
 setInterval(async () => {
-  const r = await fetch('/api/logs?since=' + seen); const d = await r.json();
+  const d = await (await fetch('/api/logs?since=' + seen)).json();
   paint(d);
   if (d.lines.length) {
     const box = $('log');
