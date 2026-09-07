@@ -16,7 +16,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Keypair, Connection } from '@solana/web3.js';
 import bs58 from 'bs58';
@@ -27,6 +27,23 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENV_PATH = path.join(HERE, '.env');
 const CONFIG_PATH = path.join(HERE, 'config.json');
 const PORT = Number(process.env.UI_PORT ?? 4321);
+
+/**
+ * Which build is actually serving this page. The HTML is baked into this module
+ * at load, so `git pull` alone changes nothing until the process restarts —
+ * printing the commit is the difference between knowing that and guessing.
+ */
+const BUILD = (() => {
+  try {
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      cwd: HERE,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return 'unknown';
+  }
+})();
 
 const ENV_KEYS = [
   'PRIVATE_KEY', 'RPC_URL', 'GRPC_URL', 'GRPC_TOKEN',
@@ -172,6 +189,7 @@ const PAGE = /* html */ `<!doctype html>
   <h1>Sniper</h1>
   <div class="pill"><span class="dot" id="dot"></span><b id="state">Stopped</b></div>
   <div class="wl" id="walletLine">No wallet</div>
+  <div class="wl" style="opacity:.55">build ${BUILD}</div>
   <div class="spacer"></div>
   <button class="go" id="startDry">Test run</button>
   <button class="primary" id="startLive">Go live</button>
