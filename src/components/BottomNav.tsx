@@ -8,6 +8,7 @@ const TABS = [
   { href: '/scan', label: 'Holders', glyph: '◍' },
   { href: '/coins', label: 'Saved', glyph: '≡' },
   { href: '/tags', label: 'Wallets', glyph: '⊙' },
+  { href: '/sniper', label: 'Sniper', glyph: '⌖' },
 ] as const;
 
 /**
@@ -27,7 +28,7 @@ export function BottomNav() {
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
-        <div className="mx-auto grid max-w-[430px] grid-cols-4">
+        <div className="mx-auto grid max-w-[430px] grid-cols-5">
           {TABS.map((tab) => {
             const active = pathname === tab.href;
             return (

@@ -1,104 +1,174 @@
 /**
- * Sniper configuration. Everything you tune lives here.
+ * Configuration.
  *
- * Read sniper/README.md before running with real money.
+ * Split deliberately in two:
+ *
+ *   .env          secrets and endpoints. Your private key lives here and
+ *                 nowhere else — never in the database, never in the web app.
+ *   config.json   everything you tune. Hot-reloaded every 3 seconds, so you can
+ *                 change size, fees or the target from your phone and the
+ *                 running bot picks it up without a restart.
+ *
+ * Run `node setup.mjs` to create both interactively.
  */
 
 import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
 
-/**
- * The scammer wallets that open the block-0 stack with ~20 SOL.
- *
- * These ROTATE roughly every four coins, so this list goes stale. Feed it from
- * your tracker rather than editing by hand: any wallet that has just received
- * 20-26 SOL from a fresh single-use funder is a candidate.
- */
-export const TARGETS = (process.env.TARGET_WALLETS ?? '')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
-
-/** Ignore a target's transaction unless they are actually committing size. */
-export const MIN_TARGET_SOL = Number(process.env.MIN_TARGET_SOL ?? 10);
-
-/** Our position size. His is 2.05. His own data says 5 SOL halves the win rate. */
-export const BUY_SOL = Number(process.env.BUY_SOL ?? 2.0);
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+export const CONFIG_PATH = path.join(HERE, 'config.json');
 
 /**
- * Priority fee, in micro-lamports per compute unit.
- *
- * Measured competition, per buy (2026-09-07):
- *   41Lur83...C3od  0.0500 SOL fee + 0.0513 tip  ->   0% failures
- *   HyMGBFBi...     0.0460 SOL fee + 0.0247 tip  ->  25% failures
- *   5hQ38HKk...     0.0002 SOL fee + 0.0047 tip  ->  59% failures
- *   FEUa5TK...Hz4   0.0000 SOL fee + 0.0047 tip  ->  92% failures
- *
- * The failure rate is a price list. To sit above C3od you need to beat
- * ~0.101 SOL of total spend. At 250k CU, 200,000 micro-lamports/CU = 0.05 SOL.
+ * Everything is expressed in SOL, never in micro-lamports per compute unit.
+ * An earlier version asked for the raw figure and the default was wrong by a
+ * factor of 1000 — it would have bid 0.00006 SOL while believing it bid 0.06,
+ * and lost every race silently. Compute-unit maths belongs in code, not in a
+ * config file a human edits.
  */
-export const CU_LIMIT = Number(process.env.CU_LIMIT ?? 250_000);
-export const CU_PRICE = Number(process.env.CU_PRICE ?? 240_000);
+export const DEFAULTS = {
+  /** Wallets to copy. One is fine; the block-0 stack usually has four. */
+  targets: [],
+  /** Ignore a target's buy below this — they also transfer and wrap. */
+  minTargetSol: 10,
+  /** Our position size. His is 2.05, and his own data says 5 halves the win rate. */
+  buySol: 2.0,
+  /** Priority fee for the whole transaction, in SOL. */
+  priorityFeeSol: 0.06,
+  /** Tip per relay, in SOL. Sent to each relay we fan out to. */
+  tipSol: 0.055,
+  /** Refuse to pay more than buySol * (1 + this/100). */
+  maxSlippagePercent: 35,
+  /** Seconds to hold before the exit fires. His median is 15-30. */
+  holdSeconds: 20,
+  /** Positions open at once. */
+  maxConcurrent: 1,
+  /** Stop trading for the day once realised PnL falls below this. */
+  dailyStopLossSol: -3,
+  /**
+   * How far through the bonding curve we assume the coin is when we land.
+   * The stack completes the curve inside the creation block, and 99% matches
+   * the measured 99.1%. Lower it if you snipe launches that are not stacked.
+   */
+  curveFractionSold: 0.99,
+  /** Compute-unit ceiling. 250k is comfortable for buy + ATA creation. */
+  computeUnitLimit: 250_000,
+  /** Master switch, so you can pause from the phone without killing the process. */
+  enabled: true,
+};
 
-/** Tip per relay, in SOL. Sent to every relay we fan out to. */
-export const TIP_SOL = Number(process.env.TIP_SOL ?? 0.055);
+export function readConfig() {
+  let stored = {};
+  try {
+    stored = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+  } catch {
+    /* first run, or mid-write — fall back to defaults */
+  }
+  const merged = { ...DEFAULTS, ...stored };
+  merged.targets = (merged.targets ?? []).filter(Boolean);
+  return merged;
+}
 
-/** Slippage ceiling on the buy: refuse to pay more than this multiple. */
-export const MAX_SOL_MULTIPLIER = Number(process.env.MAX_SOL_MULTIPLIER ?? 1.35);
+export function writeConfig(next) {
+  const merged = { ...readConfig(), ...next };
+  // Write-then-rename so a hot reload can never observe a half-written file.
+  const tmp = `${CONFIG_PATH}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(merged, null, 2));
+  fs.renameSync(tmp, CONFIG_PATH);
+  return merged;
+}
 
-/** Hold time before the exit fires, in seconds. His median is 15-30s. */
-export const HOLD_SECONDS = Number(process.env.HOLD_SECONDS ?? 20);
+/** Priority fee in SOL -> micro-lamports per compute unit. */
+export function computeUnitPrice(priorityFeeSol, computeUnitLimit) {
+  return Math.floor((priorityFeeSol * 1e9 * 1e6) / computeUnitLimit);
+}
 
-/** Never hold more than this many positions at once. */
-export const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT ?? 1);
-
-/** Stop the bot for the day once realised PnL drops below this (SOL). */
-export const DAILY_STOP_LOSS = Number(process.env.DAILY_STOP_LOSS ?? -3);
+export function validate(config) {
+  const errors = [];
+  if (!config.targets.length) errors.push('No target wallets set.');
+  for (const t of config.targets) {
+    try {
+      bs58.decode(t);
+      if (bs58.decode(t).length !== 32) throw new Error();
+    } catch {
+      errors.push(`Not a valid wallet address: ${t}`);
+    }
+  }
+  if (!(config.buySol > 0)) errors.push('buySol must be greater than 0.');
+  if (config.buySol > 10) errors.push(`buySol ${config.buySol} is very large — 5 SOL already halves the measured win rate.`);
+  if (!(config.priorityFeeSol >= 0)) errors.push('priorityFeeSol must be 0 or more.');
+  if (config.priorityFeeSol + config.tipSol > config.buySol * 0.25) {
+    errors.push(
+      `Fees (${(config.priorityFeeSol + config.tipSol).toFixed(3)} SOL) exceed 25% of the ` +
+        `position (${config.buySol} SOL). At that ratio the trade cannot pay for itself.`
+    );
+  }
+  if (!(config.holdSeconds > 0)) errors.push('holdSeconds must be greater than 0.');
+  if (!(config.curveFractionSold > 0 && config.curveFractionSold < 1)) {
+    errors.push('curveFractionSold must be between 0 and 1.');
+  }
+  return errors;
+}
 
 // ---------------------------------------------------------------------------
-// Endpoints
+// Secrets and endpoints (.env only)
 // ---------------------------------------------------------------------------
 
 export const RPC_URL = process.env.RPC_URL ?? '';
 export const GRPC_URL = process.env.GRPC_URL ?? '';
 export const GRPC_TOKEN = process.env.GRPC_TOKEN ?? '';
 
-/**
- * Submission relays. Send to all of them at once — whichever reaches the
- * leader first wins, and the losers are simply dropped as duplicates.
- *
- * Tip accounts are published by each service; put the current ones here.
- */
 export const RELAYS = [
   process.env.NOZOMI_URL && {
     name: 'nozomi',
     url: process.env.NOZOMI_URL,
-    tipAccount: process.env.NOZOMI_TIP ?? 'TEMPaMeCRFAS9EKF53Jd6KpHxgL47uWLcpFArU1Fanq',
+    tipAccount: process.env.NOZOMI_TIP || null,
   },
   process.env.ASTRALANE_URL && {
     name: 'astralane',
     url: process.env.ASTRALANE_URL,
-    tipAccount: process.env.ASTRALANE_TIP ?? 'astraRVUuTHjpwEVvNBeQEgwYx9w9CFyfxjYoobCZhL',
+    tipAccount: process.env.ASTRALANE_TIP || null,
   },
   RPC_URL && { name: 'rpc', url: RPC_URL, tipAccount: null },
 ].filter(Boolean);
 
-// ---------------------------------------------------------------------------
-// Wallet
-// ---------------------------------------------------------------------------
-
 export function loadWallet() {
   const raw = process.env.PRIVATE_KEY;
-  if (!raw) throw new Error('PRIVATE_KEY missing — see sniper/.env.example');
-  const bytes = raw.trim().startsWith('[')
-    ? Uint8Array.from(JSON.parse(raw))
-    : bs58.decode(raw.trim());
+  if (!raw) throw new Error('PRIVATE_KEY missing in .env — run `node setup.mjs`');
+  const trimmed = raw.trim();
+  const bytes = trimmed.startsWith('[')
+    ? Uint8Array.from(JSON.parse(trimmed))
+    : bs58.decode(trimmed);
+  if (bytes.length !== 64) throw new Error('PRIVATE_KEY is not a 64-byte Solana secret key');
   return Keypair.fromSecretKey(bytes);
 }
 
-/** --dry on the command line means: do everything except sign and send. */
 export const DRY_RUN = process.argv.includes('--dry');
+
+/**
+ * Optional: pull settings from the phone panel.
+ *
+ * When PANEL_URL is set the bot polls it and mirrors what it finds into
+ * config.json, so you can change size, fees or the target from your phone
+ * without touching the server. The panel never sees the private key.
+ */
+export const PANEL_URL = process.env.PANEL_URL ?? '';
+export const PANEL_TOKEN = process.env.SNIPER_TOKEN ?? '';
+
+export async function pullPanelConfig() {
+  if (!PANEL_URL) return null;
+  const url = `${PANEL_URL.replace(/\/$/, '')}/api/sniper/config${
+    PANEL_TOKEN ? `?token=${encodeURIComponent(PANEL_TOKEN)}` : ''
+  }`;
+  const res = await fetch(url, { headers: { accept: 'application/json' } });
+  if (!res.ok) throw new Error(`panel returned ${res.status}`);
+  const json = await res.json();
+  if (!json?.config) throw new Error('panel returned no config');
+  return json.config;
+}
 
 // ---------------------------------------------------------------------------
 // Program IDs
