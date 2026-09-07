@@ -35,8 +35,8 @@ const ENV_KEYS = [
 ];
 
 const CONFIG_DEFAULTS = {
-  targets: [], minTargetSol: 1, buySol: 2, priorityFeeSol: 0.06, tipSol: 0.055,
-  maxSlippagePercent: 35, holdSeconds: 0, maxConcurrent: 1, dailyStopLossSol: -3,
+  targets: [], minTargetSol: 0, buySol: 2, priorityFeeSol: 0.06, tipSol: 0.055,
+  maxSlippagePercent: 35, holdSeconds: 0, maxConcurrent: 0, dailyStopLossSol: 0,
   curveFractionSold: 0.99, computeUnitLimit: 250000, enabled: true,
 };
 
@@ -202,18 +202,22 @@ const PAGE = /* html */ `<!doctype html>
     </div>
     <div class="hint" id="feeNote"></div>
 
-    <label><span>7 · Nozomi URL — only needed to go live</span><input id="NOZOMI_URL" placeholder="a test run needs no relay"></label>
+    <label><span>7 · Max slippage %</span><input id="maxSlippagePercent" type="number"></label>
+
+    <label><span>8 · Nozomi URL — only needed to go live</span><input id="NOZOMI_URL" placeholder="a test run needs no relay"></label>
     <label><span>Nozomi tip account</span><input id="NOZOMI_TIP" placeholder="noz..."></label>
 
-    <details id="adv"><summary>Advanced</summary><div>
+    <details id="adv"><summary>Advanced — all optional, blank = off</summary><div>
       <label><span>Feed token (blank if IP-whitelisted)</span><input id="GRPC_TOKEN"></label>
       <div class="g2">
-        <label><span>Auto-sell after (seconds) — 0 = I sell it myself</span>
-          <input id="holdSeconds" type="number" min="0"></label>
-        <label><span>Ignore buys under (SOL)</span><input id="minTargetSol" type="number" step="0.5"></label>
-        <label><span>Max slippage %</span><input id="maxSlippagePercent" type="number"></label>
-        <label><span>Max open positions</span><input id="maxConcurrent" type="number"></label>
-        <label><span id="stopLabel">Daily stop loss (SOL)</span><input id="dailyStopLossSol" type="number"></label>
+        <label><span>Auto-sell after (seconds) — blank = I sell it myself</span>
+          <input id="holdSeconds" type="number" min="0" placeholder="off"></label>
+        <label><span>Ignore buys under (SOL)</span>
+          <input id="minTargetSol" type="number" step="0.5" placeholder="off"></label>
+        <label><span>Max open positions</span>
+          <input id="maxConcurrent" type="number" placeholder="no limit"></label>
+        <label><span id="stopLabel">Stop after spending (SOL)</span>
+          <input id="dailyStopLossSol" type="number" placeholder="no limit"></label>
       </div>
       <div class="hint" id="holdNote"></div>
     </div></details>
@@ -231,6 +235,8 @@ const PAGE = /* html */ `<!doctype html>
 const $ = (id) => document.getElementById(id);
 const ENV = ['PRIVATE_KEY','RPC_URL','GRPC_URL','GRPC_TOKEN','NOZOMI_URL','NOZOMI_TIP'];
 const CFG = ['buySol','holdSeconds','minTargetSol','maxSlippagePercent','maxConcurrent','dailyStopLossSol'];
+// Optional rails. 0 is stored, but shown blank so the box reads as "off".
+const OPTIONAL = ['holdSeconds','minTargetSol','maxConcurrent','dailyStopLossSol'];
 const SNIPERS = ['HyMGBFBi1H9vZcSHoevPcvkAmHiKxspAYjfnJhiz7JZd','FEUa5TK22AyRyyjKpd2bCx7se1Eczmt7AFxdS6dUfHz4'];
 // One number to bid, split the way the wallet that never misses splits it.
 const PRIORITY_SHARE = 0.52;
@@ -248,10 +254,14 @@ function feeNote(){
 
 function holdNote(){
   const s = +$('holdSeconds').value || 0;
-  $('holdNote').textContent = s > 0
-    ? 'The bot sells for you ' + s + 's after each buy.'
-    : 'Manual: the bot only buys. It never sells — every position waits for you. ' +
-      'The stop below then caps how much SOL it may spend before it halts.';
+  const cap = +$('maxConcurrent').value || 0;
+  const stop = +$('dailyStopLossSol').value || 0;
+  const parts = [s > 0
+    ? 'Sells for you ' + s + 's after each buy.'
+    : 'Manual: the bot only buys, never sells.'];
+  if (!cap) parts.push('No cap on open positions — it fires on every target buy.');
+  if (!stop) parts.push('No spend limit — it runs until you press Stop.');
+  $('holdNote').textContent = parts.join(' ');
   $('stopLabel').textContent = s > 0 ? 'Daily stop loss (SOL)' : 'Stop after spending (SOL)';
 }
 
@@ -265,7 +275,8 @@ function paint(d){
 async function load(){
   const d = await (await fetch('/api/state')).json();
   for (const k of ENV) $(k).value = d.env[k] || '';
-  for (const k of CFG) $(k).value = d.config[k];
+  for (const k of CFG) $(k).value =
+    (OPTIONAL.includes(k) && !d.config[k]) ? '' : d.config[k];
   $('feeTotal').value = +((d.config.priorityFeeSol + d.config.tipSol).toFixed(4));
   $('targets').value = (d.config.targets||[]).join('\\n');
   $('walletLine').textContent = d.wallet ? d.wallet + '  ·  ' + d.balance.toFixed(3) + ' SOL' : 'No wallet';
@@ -350,7 +361,9 @@ $('startLive').onclick = async () => {
     hold > 0 ? 'It then sells for you ' + hold + 's later.'
              : 'It NEVER sells. Every coin it buys sits in your wallet until you sell it yourself.',
     '',
-    'It stops on its own at ' + ($('dailyStopLossSol').value || '-3') + ' SOL for the day.',
+    (+$('dailyStopLossSol').value || 0) < 0
+      ? 'It halts on its own at ' + $('dailyStopLossSol').value + ' SOL.'
+      : 'NO spend limit and NO cap on positions — it keeps firing until you press Stop.',
     'Press Stop any time.',
     '',
     'Start?',
@@ -360,7 +373,7 @@ $('startLive').onclick = async () => {
 };
 $('stop').onclick = () => fetch('/api/stop',{method:'POST'});
 for (const k of ['feeTotal','buySol']) $(k).addEventListener('input', feeNote);
-$('holdSeconds').addEventListener('input', holdNote);
+for (const k of ['holdSeconds','maxConcurrent','dailyStopLossSol']) $(k).addEventListener('input', holdNote);
 
 let seen = 0;
 setInterval(async () => {

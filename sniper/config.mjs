@@ -32,8 +32,8 @@ export const CONFIG_PATH = path.join(HERE, 'config.json');
 export const DEFAULTS = {
   /** Wallets to copy. One is fine; the block-0 stack usually has four. */
   targets: [],
-  /** Ignore a target's buy below this — they also transfer and wrap. */
-  minTargetSol: 10,
+  /** Ignore a target's buy below this — they also transfer and wrap. 0 = copy all. */
+  minTargetSol: 0,
   /** Our position size. His is 2.05, and his own data says 5 halves the win rate. */
   buySol: 2.0,
   /** Priority fee for the whole transaction, in SOL. */
@@ -47,10 +47,10 @@ export const DEFAULTS = {
    * 0 means the bot never sells: it buys and leaves the position for you.
    */
   holdSeconds: 0,
-  /** Positions open at once. */
-  maxConcurrent: 1,
-  /** Stop trading for the day once realised PnL falls below this. */
-  dailyStopLossSol: -3,
+  /** Positions open at once. 0 means no cap. */
+  maxConcurrent: 0,
+  /** Stop trading once realised PnL falls below this. 0 means no limit. */
+  dailyStopLossSol: 0,
   /**
    * How far through the bonding curve we assume the coin is when we land.
    * The stack completes the curve inside the creation block, and 99% matches
@@ -101,15 +101,10 @@ export function validate(config) {
     }
   }
   if (!(config.buySol > 0)) errors.push('buySol must be greater than 0.');
-  if (config.buySol > 10) errors.push(`buySol ${config.buySol} is very large — 5 SOL already halves the measured win rate.`);
   if (!(config.priorityFeeSol >= 0)) errors.push('priorityFeeSol must be 0 or more.');
-  if (config.priorityFeeSol + config.tipSol > config.buySol * 0.25) {
-    errors.push(
-      `Fees (${(config.priorityFeeSol + config.tipSol).toFixed(3)} SOL) exceed 25% of the ` +
-        `position (${config.buySol} SOL). At that ratio the trade cannot pay for itself.`
-    );
-  }
-  // 0 is legitimate — it means "buy only, I sell by hand".
+  // Size and fee ratio are the operator's call, not ours. They are surfaced as
+  // warnings in the panel; refusing to start over them just hides the button.
+  // 0 is legitimate for holdSeconds — it means "buy only, I sell by hand".
   if (!(config.holdSeconds >= 0)) errors.push('holdSeconds must be 0 or more.');
   if (!(config.curveFractionSold > 0 && config.curveFractionSold < 1)) {
     errors.push('curveFractionSold must be between 0 and 1.');

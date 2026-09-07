@@ -132,10 +132,11 @@ async function onTargetBuy({ target, targetWallet, targetSlot }) {
   if (target.maxSolCost < config.minTargetSol) {
     return log(`skip ${target.mint.slice(0, 8)} — target only committed ~${target.maxSolCost.toFixed(1)} SOL`);
   }
-  if (state.open >= config.maxConcurrent) {
+  // Both rails are opt-in: 0 means the user turned them off.
+  if (config.maxConcurrent > 0 && state.open >= config.maxConcurrent) {
     return log(`skip ${target.mint.slice(0, 8)} — already holding ${state.open}`);
   }
-  if (state.realised <= config.dailyStopLossSol) {
+  if (config.dailyStopLossSol < 0 && state.realised <= config.dailyStopLossSol) {
     // In manual mode nothing is ever credited back, so this number is total
     // spend rather than PnL. Say which one it is, or the line reads as a loss.
     return log(
@@ -446,7 +447,8 @@ async function main() {
   log(`targets   ${config.targets.length}  ${config.targets.map((t) => t.slice(0, 6)).join(' ')}`);
   log(`size      ${config.buySol} SOL, ` +
     (config.holdSeconds > 0 ? `hold ${config.holdSeconds}s` : 'MANUAL EXIT — the bot never sells') +
-    `, max ${config.maxConcurrent} open`);
+    `, ${config.maxConcurrent > 0 ? `max ${config.maxConcurrent} open` : 'no cap on open positions'}` +
+    `, ${config.dailyStopLossSol < 0 ? `stop at ${config.dailyStopLossSol} SOL` : 'no spend limit'}`);
   log(`fees      ${perAttempt.toFixed(4)} SOL/attempt (${config.priorityFeeSol} priority + ${config.tipSol} tip) ` +
     `= ${computeUnitPrice(config.priorityFeeSol, config.computeUnitLimit).toLocaleString()} µlamports/CU`);
   log(`relays    ${RELAYS.map((r) => r.name).join(', ')}`);
