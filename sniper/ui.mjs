@@ -116,45 +116,47 @@ const PAGE = /* html */ `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sniper</title>
 <style>
-  :root{--bg:#0a0a0c;--s1:#141417;--s2:#1c1c20;--tx:#f5f5f7;--dim:#8e8e93;
+  :root{--bg:#0a0a0c;--s2:#1c1c20;--tx:#f5f5f7;--dim:#8e8e93;
         --blue:#0a84ff;--green:#30d158;--red:#ff453a;--amber:#ff9f0a;--line:rgba(255,255,255,.08)}
   *{box-sizing:border-box;margin:0}
   html,body{height:100%;overflow:hidden}
   body{background:var(--bg);color:var(--tx);
-       font:13px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+       font:13.5px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
        display:flex;flex-direction:column}
-
-  header{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--line);flex:none}
-  header h1{font-size:17px;letter-spacing:-.01em}
-  .pill{display:flex;align-items:center;gap:6px;background:var(--s2);border-radius:999px;padding:5px 11px;font-size:11.5px}
+  header{display:flex;align-items:center;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line);flex:none}
+  header h1{font-size:18px;letter-spacing:-.01em}
+  .pill{display:flex;align-items:center;gap:6px;background:var(--s2);border-radius:999px;padding:5px 12px;font-size:12px}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--dim);flex:none}
-  .wl{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--dim);
-      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px}
+  .wl{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--dim);
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:400px}
   .spacer{flex:1}
-  button{border:0;border-radius:9px;padding:8px 14px;font:600 12.5px inherit;cursor:pointer;color:#fff;white-space:nowrap}
+  button{border:0;border-radius:10px;padding:9px 16px;font:600 13px inherit;cursor:pointer;color:#fff;white-space:nowrap}
   .go{background:var(--green);color:#04210d}.primary{background:var(--blue)}
   .stop{background:var(--red)}.ghost{background:var(--s2);color:var(--tx)}
   button:disabled{opacity:.4;cursor:default}
-
-  main{flex:1;display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:12px;padding:12px 16px;min-height:0}
-  .col{display:flex;flex-direction:column;gap:9px;min-height:0;overflow:auto}
+  main{flex:1;display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:20px;padding:16px 18px;min-height:0}
+  .col{display:flex;flex-direction:column;gap:13px;min-height:0;overflow:auto}
   .col::-webkit-scrollbar{width:0}
-  h2{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);margin-top:2px}
-  label{display:block}
-  label>span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);margin-bottom:3px}
-  input,textarea{width:100%;background:var(--s2);border:0;border-radius:9px;padding:8px 10px;
-       color:var(--tx);font:13px/1.3 inherit;outline:none}
+  label>span{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);margin-bottom:4px}
+  input,textarea{width:100%;background:var(--s2);border:0;border-radius:10px;padding:10px 12px;
+       color:var(--tx);font:14px/1.35 inherit;outline:none}
   input:focus,textarea:focus{box-shadow:0 0 0 2px var(--blue) inset}
-  textarea{font-family:ui-monospace,Menlo,monospace;font-size:11px;resize:none;height:66px}
-  .g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .hint{font-size:10.5px;color:var(--dim);line-height:1.4}
-  .msg{border-radius:9px;padding:8px 10px;font-size:11.5px;line-height:1.45}
+  textarea{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;resize:none;height:62px}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .hint{font-size:11px;color:var(--dim);line-height:1.45}
+  .msg{border-radius:10px;padding:9px 11px;font-size:12px;line-height:1.45}
   .warn{background:rgba(255,159,10,.13);color:var(--amber)}
   .ok{background:rgba(48,209,88,.13);color:var(--green)}
   .err{background:rgba(255,69,58,.13);color:var(--red)}
-  #log{flex:1;min-height:0;background:#000;border-radius:11px;padding:10px;overflow:auto;
-       font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
-  @media(max-width:1100px){main{grid-template-columns:1fr 1fr}#logCol{grid-column:1/-1}}
+  details summary{cursor:pointer;font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+       color:var(--dim);list-style:none;padding:3px 0}
+  details summary::-webkit-details-marker{display:none}
+  details summary::before{content:"▸ ";}
+  details[open] summary::before{content:"▾ ";}
+  details>div{display:flex;flex-direction:column;gap:11px;padding-top:11px}
+  #log{flex:1;min-height:0;background:#000;border-radius:12px;padding:12px;overflow:auto;
+       font:11.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
+  @media(max-width:900px){main{grid-template-columns:1fr}}
 </style></head><body>
 
 <header>
@@ -170,46 +172,43 @@ const PAGE = /* html */ `<!doctype html>
 
 <main>
   <div class="col">
-    <h2>Wallet</h2>
-    <label><span>Private key (burner)</span><input id="PRIVATE_KEY" type="password" placeholder="paste, or generate"></label>
+    <label><span>1 · Your wallet (burner)</span>
+      <input id="PRIVATE_KEY" type="password" placeholder="paste a private key, or generate one"></label>
     <button class="ghost" id="gen">Generate a new wallet</button>
-    <div class="hint">Never leaves this computer.</div>
 
-    <h2>Feed — the eyes</h2>
-    <label><span>gRPC URL</span><input id="GRPC_URL" placeholder="http://84.32.104.38:10001"></label>
-    <div class="hint"><b>http://</b> for IP-whitelisted (AllenHark), <b>https://</b> for token feeds.</div>
-    <label><span>gRPC token</span><input id="GRPC_TOKEN" placeholder="blank if IP-whitelisted"></label>
-    <label><span>RPC URL</span><input id="RPC_URL" placeholder="https://mainnet.helius-rpc.com/?api-key=..."></label>
+    <label><span>2 · Feed URL</span><input id="GRPC_URL" placeholder="http://84.32.104.38:10001"></label>
+    <label><span>3 · RPC URL</span><input id="RPC_URL" placeholder="https://mainnet.helius-rpc.com/?api-key=..."></label>
+
+    <label><span>4 · Wallets to copy</span><textarea id="targets" placeholder="one per line"></textarea></label>
+    <button class="ghost" id="useSnipers">Use the known snipers</button>
+
+    <div class="g2">
+      <label><span>5 · SOL per trade</span><input id="buySol" type="number" step="0.1"></label>
+      <label><span>6 · Fee per attempt</span><input id="feeTotal" type="number" step="0.005"></label>
+    </div>
+    <div class="hint" id="feeNote"></div>
+
+    <details id="adv"><summary>Advanced</summary><div>
+      <label><span>Feed token (blank if IP-whitelisted)</span><input id="GRPC_TOKEN"></label>
+      <div class="g2">
+        <label><span>Astralane URL</span><input id="ASTRALANE_URL"></label>
+        <label><span>Astralane tip account</span><input id="ASTRALANE_TIP"></label>
+        <label><span>Nozomi URL</span><input id="NOZOMI_URL"></label>
+        <label><span>Nozomi tip account</span><input id="NOZOMI_TIP"></label>
+        <label><span>Hold seconds</span><input id="holdSeconds" type="number"></label>
+        <label><span>Ignore buys under (SOL)</span><input id="minTargetSol" type="number" step="0.5"></label>
+        <label><span>Max slippage %</span><input id="maxSlippagePercent" type="number"></label>
+        <label><span>Max open positions</span><input id="maxConcurrent" type="number"></label>
+        <label><span>Daily stop loss (SOL)</span><input id="dailyStopLossSol" type="number"></label>
+      </div>
+      <div class="hint">Relays are only used when you go live — a test run needs none.</div>
+    </div></details>
+
     <div id="msg"></div>
   </div>
 
   <div class="col">
-    <h2>Relays — the legs</h2>
-    <label><span>Astralane URL</span><input id="ASTRALANE_URL" placeholder="http://ams.gateway.astralane.io/iris?api-key=..."></label>
-    <label><span>Astralane tip account</span><input id="ASTRALANE_TIP" placeholder="astra..."></label>
-    <label><span>Nozomi URL</span><input id="NOZOMI_URL"></label>
-    <label><span>Nozomi tip account</span><input id="NOZOMI_TIP" placeholder="noz..."></label>
-
-    <h2>Targets</h2>
-    <label><textarea id="targets" placeholder="one wallet per line"></textarea></label>
-    <button class="ghost" id="useSnipers">Use the known snipers</button>
-    <div class="hint">The scammers&rsquo; ~20 SOL wallets change every coin. The snipers do not, and buy in the same block.</div>
-  </div>
-
-  <div class="col" id="logCol">
-    <h2>Trade</h2>
-    <div class="g2">
-      <label><span>SOL per trade</span><input id="buySol" type="number" step="0.1"></label>
-      <label><span>Hold seconds</span><input id="holdSeconds" type="number"></label>
-      <label><span>Priority fee</span><input id="priorityFeeSol" type="number" step="0.001"></label>
-      <label><span>Tip per relay</span><input id="tipSol" type="number" step="0.001"></label>
-      <label><span>Ignore buys under</span><input id="minTargetSol" type="number" step="0.5"></label>
-      <label><span>Max slippage %</span><input id="maxSlippagePercent" type="number"></label>
-      <label><span>Max open</span><input id="maxConcurrent" type="number"></label>
-      <label><span>Daily stop (SOL)</span><input id="dailyStopLossSol" type="number"></label>
-    </div>
-    <div class="hint" id="feeNote"></div>
-    <h2>Live log</h2>
+    <label><span>Live log</span></label>
     <div id="log"></div>
   </div>
 </main>
@@ -217,17 +216,20 @@ const PAGE = /* html */ `<!doctype html>
 <script>
 const $ = (id) => document.getElementById(id);
 const ENV = ['PRIVATE_KEY','RPC_URL','GRPC_URL','GRPC_TOKEN','ASTRALANE_URL','ASTRALANE_TIP','NOZOMI_URL','NOZOMI_TIP'];
-const CFG = ['buySol','holdSeconds','priorityFeeSol','tipSol','minTargetSol','maxSlippagePercent','maxConcurrent','dailyStopLossSol'];
+const CFG = ['buySol','holdSeconds','minTargetSol','maxSlippagePercent','maxConcurrent','dailyStopLossSol'];
 const SNIPERS = ['HyMGBFBi1H9vZcSHoevPcvkAmHiKxspAYjfnJhiz7JZd','FEUa5TK22AyRyyjKpd2bCx7se1Eczmt7AFxdS6dUfHz4'];
+// One number to bid, split the way the wallet that never misses splits it.
+const PRIORITY_SHARE = 0.52;
 
 const say = (kind, text) => { $('msg').innerHTML = '<div class="msg ' + kind + '">' + text + '</div>'; };
 
 function feeNote(){
-  const per = (+$('priorityFeeSol').value||0) + (+$('tipSol').value||0);
-  const size = +$('buySol').value||0;
+  const per = +$('feeTotal').value || 0;
+  const size = +$('buySol').value || 0;
   const pct = size ? (per/size*100).toFixed(1) : '0';
-  $('feeNote').textContent = per.toFixed(4) + ' SOL per attempt — ' + pct + '% of the position, ' +
-    (per > 0.101 ? 'above every sniper measured on these coins.' : 'below the 0.101 that buys a 0% failure rate.');
+  $('feeNote').textContent = pct + '% of the position — ' +
+    (per > 0.101 ? 'above every sniper measured on these coins.'
+                 : 'below the 0.101 SOL that buys a 0% failure rate.');
 }
 
 function paint(d){
@@ -241,6 +243,7 @@ async function load(){
   const d = await (await fetch('/api/state')).json();
   for (const k of ENV) $(k).value = d.env[k] || '';
   for (const k of CFG) $(k).value = d.config[k];
+  $('feeTotal').value = +((d.config.priorityFeeSol + d.config.tipSol).toFixed(4));
   $('targets').value = (d.config.targets||[]).join('\\n');
   $('walletLine').textContent = d.wallet ? d.wallet + '  ·  ' + d.balance.toFixed(3) + ' SOL' : 'No wallet';
   feeNote(); paint(d);
@@ -250,6 +253,9 @@ async function save(){
   const env = {}; for (const k of ENV) env[k] = $(k).value.trim();
   const config = { targets: $('targets').value.split(/[\\s,]+/).filter(Boolean) };
   for (const k of CFG) config[k] = Number($(k).value);
+  const fee = +$('feeTotal').value || 0;
+  config.priorityFeeSol = +(fee * PRIORITY_SHARE).toFixed(6);
+  config.tipSol = +(fee * (1 - PRIORITY_SHARE)).toFixed(6);
   const d = await (await fetch('/api/save', {method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({env,config})})).json();
   if (d.error) { say('err', d.error); return false; }
@@ -270,7 +276,7 @@ $('startLive').onclick = async () => {
   if (await save()) fetch('/api/start',{method:'POST'});
 };
 $('stop').onclick = () => fetch('/api/stop',{method:'POST'});
-for (const k of ['priorityFeeSol','tipSol','buySol']) $(k).addEventListener('input', feeNote);
+for (const k of ['feeTotal','buySol']) $(k).addEventListener('input', feeNote);
 
 let seen = 0;
 setInterval(async () => {

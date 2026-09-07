@@ -25,7 +25,16 @@ import {
 import { BlockhashCache, fanOut } from './send.mjs';
 import { record, setStatus, startReporting } from './report.mjs';
 
-const wallet = loadWallet();
+let wallet;
+try {
+  wallet = loadWallet();
+} catch (err) {
+  // Thrown at module load, before main()'s handling — so catch it here and say
+  // the one useful thing instead of a stack trace. This is the first thing a
+  // new user sees in the control panel's log.
+  console.error(`\n  ${err.message}\n  Set a wallet at the top of the control panel and press Save.\n`);
+  process.exit(1);
+}
 const connection = new Connection(RPC_URL, 'confirmed');
 const blockhashes = new BlockhashCache(connection);
 
