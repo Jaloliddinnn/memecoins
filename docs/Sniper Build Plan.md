@@ -87,18 +87,108 @@ His measured stack: his own deployed program `4RoVsR9z…` (one instruction, ATA
 
 ---
 
-## 4. Infrastructure, with 2026 prices
+## 3b. Correction — you probably do not need to buy any of this
 
-### The pre-block feed — this is the hard part right now
+*Added 2026-09-07 after analysing `HhZvraK3x5zL4otbr4Dti2PeEVSWppPtPCeMnxsRgpap`.
+It overturns the shopping list in §4 and softens the fee claim in §3.*
+
+`HhZvraK3` lands in the **same slot** as `HyMGBFBi` on **21 of 34** coins they both
+traded, and one slot *earlier* on 2 more — level or better on 23 of 34. And it pays:
+
+| | Per attempt | Failure rate | Slot 0? |
+| --- | --- | --- | --- |
+| `HyMGBFBi` — own program + Nozomi | **0.0707 SOL** | 25% | yes |
+| `HhZvraK3` — FLASHX | **0.0070 SOL** | **15%** | yes, ~2/3 of the time |
+
+**Ten times cheaper, a lower failure rate, and the same slot.** So "the failure rate is a
+price list" is only true for operators running their own submission path. It is not a law.
+
+### What FLASHX is
+
+`FLASHX8DrLbgeR8FcfNV1F5krxYcYMUdBkrP1EPBtxB9` — a deployed, upgradeable program
+(authority `AxDepcBgxQXcEYTQokwbyR6D8R4fxF6aAQMs8Kr2TmjW`) running at **~1,300
+transactions per minute**, used by **412 distinct wallets in 600 consecutive
+transactions**. That is a public execution service, not a private tool. It charges a flat
+~0.00204 SOL and evidently maintains its own fast path to the leader.
+
+`HhZvraK3` uses it for 97 of its buys and 446 of its sells. `HyMGBFBi` uses it for sells
+only, and pays for its own buy infrastructure.
+
+It has no website in any search result, so treat it as unvetted: it is somebody else's
+program in your transaction path. But it is unambiguously getting hundreds of wallets into
+slot 0 for 0.007 SOL.
+
+### So the real gap is discipline, not speed
+
+`HhZvraK3` has the access and squanders it — **+3.78 SOL over two days at 1.70% ROI**,
+against `HyMGBFBi`'s ~12.89% ROI at 2 SOL:
+
+| Position size | n | Win rate | ROI |
+| --- | --- | --- | --- |
+| < 1 SOL | 9 | 22% | 49.33% |
+| 1–3 SOL | 20 | 70% | 7.44% |
+| 3–6 SOL | 30 | 83% | 3.75% |
+| **> 6 SOL** | 7 | 71% | **−9.94%** |
+
+Median size 3.11 SOL, ranging 0.25 to 16.15. The >6 SOL bucket alone lost 5.84 SOL —
+the same size penalty `HyMGBFBi` shows, on a different wallet, in a different week.
+
+*(Its hold-time buckets look damning for fast exits — ≤20s returns −26% — but that is
+almost certainly reversed causation: bad entries get cut fast. Do not read it as
+"hold longer".)*
+
+**The combination nobody in this cohort runs is FLASHX's access with `HyMGBFBi`'s
+discipline: one fixed 2 SOL size, a hard 20–30 second exit, no exceptions.**
+
+### Revised order of operations
+
+1. Point the bot at whatever feed you can get cheaply and run `--dry`. **Measure the slot
+   delta.** Do not buy anything on the strength of a provider's marketing.
+2. If you are landing at slot +1, try routing through FLASHX before spending $500/mo on
+   shreds — a wallet doing exactly that reaches slot 0 for 0.007 SOL.
+3. Only buy dedicated shred infrastructure if both of those fail.
+
+*Read §3b first — it may make most of this unnecessary.*
+
+### Does a gRPC endpoint actually get you slot 0?
+
+Researched, because it is the question the whole plan turns on. **A standard Yellowstone
+gRPC stream emits after the validator executes the block.** Shreds — the packets validators
+exchange while a block is still being produced — arrive before that. So a plain gRPC
+endpoint structurally puts you one slot behind on a same-block snipe.
+
+Two things muddy this in practice:
+
+- **Some providers feed their nodes with shreds**, which makes their gRPC emit sooner
+  without making it pre-block. Chainstack's docs say ShredStream is "enabled by default"
+  for exactly this reason — but Jito's ShredStream shut down on 5 September 2026, so that
+  claim may now be stale.
+- **Some providers stream decoded shreds over the gRPC wire protocol** (OrbitFlare's
+  Jetstream, AllenHark's shared gRPC). Those are pre-block *and* speak the same protocol,
+  so a Yellowstone client switches to them by changing one URL.
+
+The marketing does not distinguish these, and neither do the product names. **The only way
+to know what you bought is to run `--dry` and read the slot delta.** That is why the bot
+prints it.
+
+### The pre-block feed
 
 **Jito ShredStream shut down on 5 September 2026** — two days ago. That was the standard
 50–200ms pre-block feed. Current options:
 
+**Jito ShredStream shut down on 5 September 2026.** Current options:
+
 | Option | Notes | Price |
 | --- | --- | --- |
+| **AllenHark shared gRPC** | Shred-backed, gRPC wire protocol — **cheapest way to test the slot-0 question** | **$10/day**, $59/week, $199/mo |
+| AllenHark direct UDP | Raw shreds | $199/mo |
+| AllenHark dedicated cluster | gRPC + UDP, isolated | $422/mo |
+| **Supanode raw shreds** | UDP multicast, Frankfurt only, 7-day minimum | $200/mo per IP |
+| **OrbitFlare** | 9 regions, 60-min free trial; Jetstream decodes to gRPC | $500/mo standard, $1,000/mo premium |
 | **DoubleZero Edge** | Jito's own recommended migration path; free trial | varies |
-| **OrbitFlare shreds** | 9 regions, 60-min free trial | **$500/mo** standard region, **$1,000/mo** premium |
-| Run your own validator/shred receiver | Full control, real ops burden | node cost + time |
+
+**$10 for a day at AllenHark answers the slot-0 question outright.** Run `--dry` against it
+and read the delta. That is a far better first purchase than a month of anything.
 
 ### Post-block feeds — cheap, and **not sufficient** for this trade (see §2)
 
