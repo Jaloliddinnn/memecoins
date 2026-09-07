@@ -327,10 +327,50 @@ async function watchGrpc() {
 // ---------------------------------------------------------------------------
 
 async function main() {
+  /**
+   * On a platform like Railway there is no config.json — the filesystem is
+   * ephemeral and setup.mjs is interactive, so it cannot be run there. The
+   * settings come from the /sniper panel instead, and they have to be fetched
+   * BEFORE validation or the bot exits on "no targets" and crash-loops.
+   */
+  if (PANEL_URL) {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      try {
+        const remote = await pullPanelConfig();
+        if (remote) {
+          config = { ...config, ...remote };
+          writeConfig(remote);
+          log(`config pulled from panel — ${config.targets.length} target(s)`);
+          break;
+        }
+      } catch (err) {
+        log(`panel unreachable (${err.message}), retrying in 6s`);
+        await new Promise((r) => setTimeout(r, 6000));
+      }
+    }
+  }
+
   const errors = validate(config);
   if (errors.length) {
-    console.error('\nConfiguration problems:\n  ' + errors.join('\n  ') + '\n\nRun `node setup.mjs`.\n');
-    process.exit(1);
+    if (PANEL_URL) {
+      // Waiting is right here: the operator fixes it on the panel and the
+      // hot-reload picks it up. Exiting would just crash-loop the container.
+      log('Waiting for a usable config from the panel:');
+      for (const e of errors) log('  · ' + e);
+      log(`Open ${PANEL_URL}/sniper, set your targets, and press Save.`);
+      await new Promise((resolve) => {
+        const timer = setInterval(() => {
+          if (!validate(config).length) {
+            clearInterval(timer);
+            log('config is now valid — starting');
+            resolve();
+          }
+        }, 5000);
+      });
+    } else {
+      console.error('\nConfiguration problems:\n  ' + errors.join('\n  ') + '\n\nRun `node setup.mjs`.\n');
+      process.exit(1);
+    }
   }
   if (!RPC_URL) throw new Error('RPC_URL missing — run `node setup.mjs`');
   if (!RELAYS.length) throw new Error('No relays configured — run `node setup.mjs`');

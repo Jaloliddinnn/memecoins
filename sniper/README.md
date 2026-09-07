@@ -22,6 +22,40 @@ node setup.mjs
 If you leave the private key blank it generates a fresh burner and prints the
 address to fund.
 
+## Running it on Railway
+
+No server to rent, and it deploys from this repo. Railway's filesystem is
+ephemeral and `setup.mjs` is interactive, so on Railway the settings come from
+the `/sniper` panel instead of `config.json` — the bot fetches them at startup
+and waits, rather than crash-looping, until they are valid.
+
+1. In your Railway project → **New → GitHub Repo** → this repo.
+2. Service **Settings → Root Directory: `sniper`**. It picks up
+   `sniper/railway.json`, which starts it in `--dry`.
+3. Service **Settings → Region: `europe-west (Amsterdam)`**. Match your feed's
+   region; distance is latency and latency is the whole game.
+4. **Variables** — everything from `.env.example`, most importantly:
+
+   | Variable | Value |
+   | --- | --- |
+   | `PRIVATE_KEY` | your burner |
+   | `RPC_URL` | your Helius URL |
+   | `GRPC_URL` / `GRPC_TOKEN` | from your feed provider |
+   | `ASTRALANE_URL` / `ASTRALANE_TIP` | or Nozomi's pair |
+   | `PANEL_URL` | your deployed app, e.g. `https://yourapp.up.railway.app` |
+   | `SNIPER_TOKEN` | the same value on both services |
+
+5. Open `/sniper` on your phone, paste the target wallets, press **Save**. The
+   bot picks it up within 5 seconds.
+6. Read the logs for the `[dry] … slot(s) later` line.
+
+To go live, change the start command to `node index.mjs` — but only after
+`--dry` has shown you a slot delta of 0.
+
+**Railway cannot run the raw-UDP shred path.** That needs a fixed public IP with
+an inbound UDP port, and a Rust proxy you build yourself. gRPC is an outbound
+connection, so it works fine.
+
 ## Changing settings from your phone
 
 Open `/sniper` in your deployed app. Target wallet, trade size, priority fee,
