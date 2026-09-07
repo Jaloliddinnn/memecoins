@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { SniperConfig } from '@/lib/tracker/sniperConfig';
+import { SniperLive } from '@/components/tracker/SniperLive';
 
 /** What each sniper on these coins actually pays, and what it buys them. */
 const FEE_BENCHMARKS = [
@@ -175,6 +176,8 @@ export default function SniperPage() {
           />
         </span>
       </button>
+
+      <SniperLive token={token} />
 
       {/* Targets */}
       <section className="mt-5">

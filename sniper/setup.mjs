@@ -115,6 +115,9 @@ console.log('\n  gRPC (Yellowstone/Geyser) is what makes this work. A plain RPC'
 console.log('  websocket hands you the block AFTER it is built, so you fire one');
 console.log('  slot late — and one slot costs ~13.5% of an ~18% move.');
 console.log('  Chainstack from $49/mo, rpc edge from $249, Shyft from $199.\n');
+console.log("  Include the protocol: https://host:443 for TLS feeds, or");
+console.log("  http://host:port for plain IP-whitelisted ones (AllenHark's gRPC");
+console.log('  proxy is this kind — use http:// and leave the token blank).');
 const grpcUrl = await ask('  gRPC URL', envValue('GRPC_URL'));
 const grpcToken = await ask('  gRPC token (blank if none)', envValue('GRPC_TOKEN'));
 

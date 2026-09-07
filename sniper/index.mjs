@@ -23,6 +23,7 @@ import {
   findTargetBuy, cloneBuy, cloneSell, findPumpSwapSell, accountFlags,
 } from './clone.mjs';
 import { BlockhashCache, fanOut } from './send.mjs';
+import { record, setStatus, startReporting } from './report.mjs';
 
 const wallet = loadWallet();
 const connection = new Connection(RPC_URL, 'confirmed');
@@ -33,6 +34,12 @@ const state = { open: 0, fired: 0, slot0: 0, late: 0, missed: 0, realised: 0, st
 const seenMints = new Set();
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 23), ...a);
+
+/** Log locally and push to the panel in one call. */
+const report = (kind, message, extra) => {
+  log(message);
+  record(kind, message, extra);
+};
 
 /**
  * Hot reload from disk, and — if PANEL_URL is set — from the phone panel.
@@ -72,6 +79,8 @@ if (PANEL_URL) {
 // ---------------------------------------------------------------------------
 // Decoding a streamed transaction into a uniform shape
 // ---------------------------------------------------------------------------
+
+let onConnectionChange = () => {};
 
 const b58 = (v) => (typeof v === 'string' ? v : bs58.encode(v));
 
@@ -133,10 +142,11 @@ async function onTargetBuy({ target, targetWallet, targetSlot }) {
 
   state.open++;
   state.fired++;
-  log(
-    `FIRE ${target.mint} | target ${targetWallet.slice(0, 8)} committed ~${target.maxSolCost.toFixed(1)} SOL | ` +
-      `we buy ${config.buySol} SOL for ~${Math.round(built.estimatedTokens).toLocaleString()} tokens ` +
-      `(ceiling ${built.maxSol.toFixed(3)})`
+  report(
+    'fire',
+    `FIRE — target ${targetWallet.slice(0, 8)} committed ~${target.maxSolCost.toFixed(1)} SOL, ` +
+      `we buy ${config.buySol} SOL (ceiling ${built.maxSol.toFixed(3)})`,
+    { mint: target.mint, targetWallet, targetSol: target.maxSolCost, ourSol: config.buySol }
   );
 
   try {
@@ -154,8 +164,12 @@ async function onTargetBuy({ target, targetWallet, targetSlot }) {
       const behind = now - targetSlot;
       state.slot0 += behind <= 0 ? 1 : 0;
       state.late += behind > 0 ? 1 : 0;
-      log(`  [dry] target slot ${targetSlot}, we were ready ~${behind} slot(s) later` +
-        (behind > 0 ? '  ⚠ too slow to profit — see README' : '  ✓ same slot'));
+      report(
+        behind > 0 ? 'late' : 'land',
+        `DRY: ready ~${behind} slot(s) after the target` +
+          (behind > 0 ? ' — too slow to profit at this distance' : ' — same slot'),
+        { mint: target.mint, behind, targetSlot }
+      );
       return;
     }
     await settle({ signature: result.signatures[0], built, targetSlot });
@@ -182,12 +196,12 @@ async function settle({ signature, built, targetSlot }) {
   if (!tx) {
     state.open--;
     state.missed++;
-    return log(`  MISSED — buy never landed (${signature.slice(0, 16)}…)`);
+    return report('miss', `MISSED — buy never landed (${signature.slice(0, 12)}…)`, { mint: built.mint.toBase58() });
   }
   if (tx.meta?.err) {
     state.open--;
     state.missed++;
-    return log(`  REVERTED — ${JSON.stringify(tx.meta.err).slice(0, 120)}`);
+    return report('miss', `REVERTED — ${JSON.stringify(tx.meta.err).slice(0, 120)}`, { mint: built.mint.toBase58() });
   }
 
   const behind = tx.slot - targetSlot;
@@ -195,8 +209,11 @@ async function settle({ signature, built, targetSlot }) {
   else state.late++;
   const spent = (tx.meta.preBalances[0] - tx.meta.postBalances[0]) / 1e9;
   state.realised -= spent;
-  log(`  LANDED slot ${tx.slot} (target ${targetSlot}, +${behind}) spent ${spent.toFixed(4)} SOL`);
-  if (behind > 0) log('  ⚠ a slot late — this trade is probably underwater before it starts');
+  report(
+    behind > 0 ? 'late' : 'land',
+    `LANDED slot ${tx.slot}, ${behind === 0 ? 'same slot as the target' : `+${behind} slot(s) late`}, spent ${spent.toFixed(4)} SOL`,
+    { mint: built.mint.toBase58(), behind, spent }
+  );
 
   setTimeout(() => exit(built), config.holdSeconds * 1000);
 }
@@ -241,7 +258,7 @@ async function exit(built) {
 
     const accounts = await findSellTemplate(mint);
     if (!accounts) {
-      return log(`  ⚠ no PumpSwap sell template for ${mint} — SELL MANUALLY`);
+      return report('error', `No PumpSwap sell template found — SELL MANUALLY`, { mint });
     }
 
     const sell = cloneSell({
@@ -264,13 +281,13 @@ async function exit(built) {
       if (tx && !tx.meta?.err) {
         const got = (tx.meta.postBalances[0] - tx.meta.preBalances[0]) / 1e9;
         state.realised += got;
-        log(`  EXIT filled, +${got.toFixed(4)} SOL | day PnL ${state.realised.toFixed(4)} SOL`);
+        report('exit', `EXIT filled +${got.toFixed(4)} SOL — day PnL ${state.realised.toFixed(4)} SOL`, { mint, got });
       } else {
-        log(`  ⚠ EXIT did not confirm on ${mint} — SELL MANUALLY`);
+        report('error', `EXIT did not confirm — SELL MANUALLY`, { mint });
       }
     }
   } catch (err) {
-    log(`  ⚠ EXIT FAILED on ${mint} — SELL MANUALLY: ${err.message}`);
+    report('error', `EXIT FAILED — SELL MANUALLY: ${err.message}`, { mint });
   } finally {
     state.open--;
   }
@@ -304,7 +321,8 @@ async function watchGrpc() {
   });
 
   stream.on('error', (err) => {
-    log('gRPC error, reconnecting in 2s:', err.message);
+    onConnectionChange(false);
+    report('error', `Feed dropped: ${err.message} — reconnecting`);
     setTimeout(() => watchGrpc().catch((e) => log('reconnect failed:', e.message)), 2000);
   });
 
@@ -321,7 +339,8 @@ async function watchGrpc() {
     );
   });
 
-  log(`gRPC subscribed — ${config.targets.length} wallets at PROCESSED commitment`);
+  onConnectionChange(true);
+  report('info', `Feed connected — watching ${config.targets.length} wallet(s) at PROCESSED commitment`);
 }
 
 // ---------------------------------------------------------------------------
@@ -398,6 +417,29 @@ async function main() {
   }
 
   await watchGrpc();
+
+  let grpcConnected = false;
+  onConnectionChange = (up) => { grpcConnected = up; };
+
+  const heartbeat = async () => {
+    setStatus({
+      mode: DRY_RUN ? 'DRY' : 'LIVE',
+      connected: grpcConnected,
+      wallet: wallet.publicKey.toBase58(),
+      balanceSol: await connection.getBalance(wallet.publicKey).then((b) => b / 1e9).catch(() => 0),
+      targets: config.targets.length,
+      fired: state.fired,
+      slot0: state.slot0,
+      late: state.late,
+      missed: state.missed,
+      openPositions: state.open,
+      realisedSol: state.realised,
+      feed: GRPC_URL.replace(/\/\/.*@/, '//'),
+    });
+  };
+  startReporting();
+  heartbeat();
+  setInterval(heartbeat, 10_000).unref?.();
 
   setInterval(() => {
     const attempts = state.slot0 + state.late;
