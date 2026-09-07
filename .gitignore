@@ -35,3 +35,7 @@ next-env.d.ts
 
 # prisma
 /prisma/migrations/dev/
+
+# sniper bot — its own deps and secrets
+/sniper/node_modules
+/sniper/.env

@@ -1,0 +1,17 @@
+{
+  "name": "coat-tail-sniper",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Clones the block-0 buy of tracked scammer wallets on pump.fun.",
+  "scripts": {
+    "dry": "node index.mjs --dry",
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.0",
+    "@triton-one/yellowstone-grpc": "^1.3.0",
+    "bs58": "^6.0.0",
+    "dotenv": "^16.4.5"
+  }
+}
