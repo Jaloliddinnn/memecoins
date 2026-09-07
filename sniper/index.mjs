@@ -301,6 +301,7 @@ async function watchGrpc() {
   const mod = await import('@triton-one/yellowstone-grpc');
   const Client = mod.default?.default ?? mod.default;
   const CommitmentLevel = mod.CommitmentLevel ?? mod.default?.CommitmentLevel;
+  const SubscribeRequest = mod.SubscribeRequest ?? mod.default?.SubscribeRequest;
 
   const client = new Client(GRPC_URL, GRPC_TOKEN || undefined, undefined);
   const stream = await client.subscribe();
@@ -327,16 +328,25 @@ async function watchGrpc() {
   });
 
   await new Promise((resolve, reject) => {
-    stream.write(
-      {
-        accounts: {}, slots: {}, blocks: {}, blocksMeta: {}, entry: {}, accountsDataSlice: [],
-        transactions: {
-          targets: { accountInclude: config.targets, accountExclude: [], accountRequired: [], vote: false, failed: false },
+    // Built with fromPartial rather than a hand-written literal. The request
+    // has more fields than the ones that matter here (transactionsStatus, ping,
+    // fromSlot), and omitting any of them fails serialization with an opaque
+    // "Cannot convert undefined or null to object" — which reads like a network
+    // fault and is not. fromPartial fills the rest, and keeps filling them if
+    // the library adds more.
+    const request = SubscribeRequest.fromPartial({
+      transactions: {
+        targets: {
+          accountInclude: config.targets,
+          accountExclude: [],
+          accountRequired: [],
+          vote: false,
+          failed: false,
         },
-        commitment: CommitmentLevel.PROCESSED,
       },
-      (err) => (err ? reject(err) : resolve())
-    );
+      commitment: CommitmentLevel.PROCESSED,
+    });
+    stream.write(request, (err) => (err ? reject(err) : resolve()));
   });
 
   onConnectionChange(true);

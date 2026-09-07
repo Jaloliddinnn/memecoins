@@ -5,8 +5,11 @@
   "type": "module",
   "description": "Clones the block-0 buy of tracked scammer wallets on pump.fun.",
   "scripts": {
+    "start": "node ui.mjs",
+    "ui": "node ui.mjs",
     "dry": "node index.mjs --dry",
-    "start": "node index.mjs"
+    "bot": "node index.mjs",
+    "setup": "node setup.mjs"
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.0",
