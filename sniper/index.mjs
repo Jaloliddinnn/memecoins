@@ -3,7 +3,7 @@
  *
  *   watch the target wallets  ->  one opens a block-0 buy
  *   ->  clone their instruction for our size  ->  fan out to every relay
- *   ->  sell everything holdSeconds later
+ *   ->  sell holdSeconds later, or leave the bag for you when holdSeconds is 0
  *
  * Run `node setup.mjs` first, then `node index.mjs --dry` for a day.
  *
@@ -136,7 +136,14 @@ async function onTargetBuy({ target, targetWallet, targetSlot }) {
     return log(`skip ${target.mint.slice(0, 8)} — already holding ${state.open}`);
   }
   if (state.realised <= config.dailyStopLossSol) {
-    return log(`STOPPED — daily stop loss hit (${state.realised.toFixed(3)} SOL)`);
+    // In manual mode nothing is ever credited back, so this number is total
+    // spend rather than PnL. Say which one it is, or the line reads as a loss.
+    return log(
+      config.holdSeconds > 0
+        ? `STOPPED — daily stop loss hit (${state.realised.toFixed(3)} SOL)`
+        : `STOPPED — spent ${Math.abs(state.realised).toFixed(3)} SOL on buys, ` +
+          `the budget. Sell your bags, then restart to reset it.`
+    );
   }
   if (blockhashes.stale) return log('skip — blockhash is stale, RPC may be down');
 
@@ -224,7 +231,19 @@ async function settle({ signature, built, targetSlot }) {
     { mint: built.mint.toBase58(), behind, spent }
   );
 
-  setTimeout(() => exit(built), config.holdSeconds * 1000);
+  if (config.holdSeconds > 0) {
+    setTimeout(() => exit(built), config.holdSeconds * 1000);
+    return;
+  }
+
+  // Manual mode. The bot is done with this coin — it will never sell it. Free
+  // the concurrency slot now, or maxConcurrent would jam after the first buy
+  // and the bot would sit there watching launches go by.
+  state.open--;
+  report('hold', `HOLDING ${built.mint.toBase58()} — sell it yourself`, {
+    mint: built.mint.toBase58(),
+    manual: true,
+  });
 }
 
 /** Find any recent PumpSwap sell on this mint and lift its pool accounts. */
@@ -425,7 +444,9 @@ async function main() {
   log(`wallet    ${wallet.publicKey.toBase58()}`);
   log(`balance   ${balance.toFixed(4)} SOL`);
   log(`targets   ${config.targets.length}  ${config.targets.map((t) => t.slice(0, 6)).join(' ')}`);
-  log(`size      ${config.buySol} SOL, hold ${config.holdSeconds}s, max ${config.maxConcurrent} open`);
+  log(`size      ${config.buySol} SOL, ` +
+    (config.holdSeconds > 0 ? `hold ${config.holdSeconds}s` : 'MANUAL EXIT — the bot never sells') +
+    `, max ${config.maxConcurrent} open`);
   log(`fees      ${perAttempt.toFixed(4)} SOL/attempt (${config.priorityFeeSol} priority + ${config.tipSol} tip) ` +
     `= ${computeUnitPrice(config.priorityFeeSol, config.computeUnitLimit).toLocaleString()} µlamports/CU`);
   log(`relays    ${RELAYS.map((r) => r.name).join(', ')}`);

@@ -42,8 +42,11 @@ export const DEFAULTS = {
   tipSol: 0.055,
   /** Refuse to pay more than buySol * (1 + this/100). */
   maxSlippagePercent: 35,
-  /** Seconds to hold before the exit fires. His median is 15-30. */
-  holdSeconds: 20,
+  /**
+   * Seconds to hold before the exit fires. His median is 15-30.
+   * 0 means the bot never sells: it buys and leaves the position for you.
+   */
+  holdSeconds: 0,
   /** Positions open at once. */
   maxConcurrent: 1,
   /** Stop trading for the day once realised PnL falls below this. */
@@ -106,7 +109,8 @@ export function validate(config) {
         `position (${config.buySol} SOL). At that ratio the trade cannot pay for itself.`
     );
   }
-  if (!(config.holdSeconds > 0)) errors.push('holdSeconds must be greater than 0.');
+  // 0 is legitimate — it means "buy only, I sell by hand".
+  if (!(config.holdSeconds >= 0)) errors.push('holdSeconds must be 0 or more.');
   if (!(config.curveFractionSold > 0 && config.curveFractionSold < 1)) {
     errors.push('curveFractionSold must be between 0 and 1.');
   }

@@ -36,7 +36,7 @@ export interface SniperStatus {
 export interface SniperEvent {
   id?: number;
   at: number;
-  kind: 'fire' | 'land' | 'late' | 'exit' | 'miss' | 'info' | 'error';
+  kind: 'fire' | 'land' | 'late' | 'exit' | 'hold' | 'miss' | 'info' | 'error';
   mint?: string;
   message: string;
   data?: Record<string, unknown>;

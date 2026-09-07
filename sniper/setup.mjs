@@ -181,7 +181,8 @@ if (total > buySol * 0.25) console.log('  ⚠ Over 25% of the position. The trad
 else if (total > 0.101) console.log('  You would outbid every sniper measured on these coins.');
 else console.log('  ⚠ Below the 0.101 SOL that buys a 0% failure rate.');
 
-const holdSeconds = await askNumber('\n  hold seconds before selling', existingConfig.holdSeconds ?? 20);
+console.log('\n  Exit. 0 means the bot only buys and you sell every bag by hand.');
+const holdSeconds = await askNumber('  auto-sell after (seconds, 0 = manual)', existingConfig.holdSeconds ?? 0);
 const maxConcurrent = await askNumber('  max positions at once', existingConfig.maxConcurrent ?? 1);
 const dailyStopLossSol = await askNumber('  daily stop loss (SOL, negative)', existingConfig.dailyStopLossSol ?? -3);
 const minTargetSol = await askNumber('  ignore target buys below (SOL)', existingConfig.minTargetSol ?? 10);

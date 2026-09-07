@@ -7,6 +7,7 @@ const KIND_COLOR: Record<SniperEvent['kind'], string> = {
   fire: 'var(--blue)',
   land: 'var(--green)',
   exit: 'var(--green)',
+  hold: 'var(--blue)',
   late: '#ff9f0a',
   miss: '#ff9f0a',
   error: 'var(--red)',
