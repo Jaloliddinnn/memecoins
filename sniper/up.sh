@@ -39,6 +39,18 @@ npm install --silent || exit 1
 echo
 echo "==> starting  (build $(git rev-parse --short HEAD))"
 echo "    http://127.0.0.1:$PORT"
-echo "    Check the build number in the page header matches the line above."
 echo
-exec npm start
+echo "    From now on use the Update button in the page — it pulls and"
+echo "    restarts itself. You should not need this terminal again."
+echo
+
+# Exit code 75 means "the Update button pulled new code, bring me back up".
+# Anything else is a real exit and the loop ends.
+while true; do
+  node ui.mjs
+  code=$?
+  [ "$code" -eq 75 ] || exit "$code"
+  echo
+  echo "==> restarting into $(git rev-parse --short HEAD)"
+  npm install --silent
+done

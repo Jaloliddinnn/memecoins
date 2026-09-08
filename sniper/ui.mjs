@@ -127,6 +127,50 @@ function stopBot() {
   return { ok: true };
 }
 
+/**
+ * Pull and restart in place, so updating never means a terminal again.
+ *
+ * The page is compiled into this module at load, so new code only appears after
+ * the process restarts. up.sh watches for exit code 75 and relaunches; run any
+ * other way, the pull still lands and the exit is visible.
+ */
+const RESTART_CODE = 75;
+
+function runGit(args) {
+  try {
+    return {
+      ok: true,
+      out: execFileSync('git', args, {
+        cwd: path.join(HERE, '..'),
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 60_000,
+      }).trim(),
+    };
+  } catch (err) {
+    return { ok: false, out: `${err.stdout ?? ''}${err.stderr ?? ''}`.trim() || err.message };
+  }
+}
+
+function selfUpdate() {
+  if (child) return { error: 'Stop the bot first — updating restarts the panel.' };
+
+  const before = runGit(['rev-parse', 'HEAD']);
+  const pull = runGit(['pull', '--ff-only']);
+  if (!pull.ok) {
+    return {
+      error: 'Pull failed. Your settings are safe — they are not in git.',
+      detail: pull.out.slice(0, 400),
+    };
+  }
+  const after = runGit(['rev-parse', 'HEAD']);
+  if (before.out && before.out === after.out) return { ok: true, changed: false };
+
+  // Let the response flush before the process goes away.
+  setTimeout(() => process.exit(RESTART_CODE), 250);
+  return { ok: true, changed: true, build: after.out.slice(0, 7) };
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -190,11 +234,12 @@ const PAGE = /* html */ `<!doctype html>
   <div class="pill"><span class="dot" id="dot"></span><b id="state">Stopped</b></div>
   <div class="wl" id="walletLine">No wallet</div>
   <div class="wl" style="opacity:.55">build ${BUILD}</div>
+  <div class="wl" id="saved" style="color:var(--green)"></div>
   <div class="spacer"></div>
   <button class="go" id="startDry">Test run</button>
   <button class="primary" id="startLive">Go live</button>
   <button class="stop" id="stop" disabled>Stop</button>
-  <button class="ghost" id="save">Save</button>
+  <button class="ghost" id="update">Update</button>
 </header>
 
 <main>
@@ -294,6 +339,7 @@ function paint(d){
 async function load(){
   const d = await (await fetch('/api/state')).json();
   for (const k of ENV) $(k).value = d.env[k] || '';
+  loadedKey = d.env.PRIVATE_KEY || '';
   for (const k of CFG) $(k).value =
     (OPTIONAL.includes(k) && !d.config[k]) ? '' : d.config[k];
   $('feeTotal').value = +((d.config.priorityFeeSol + d.config.tipSol).toFixed(4));
@@ -302,10 +348,19 @@ async function load(){
   feeNote(); holdNote(); paint(d);
 }
 
-async function save(){
-  const env = {}; for (const k of ENV) env[k] = $(k).value.trim();
-  // A pasted seed phrase is not itself a key — send the derived one the user picked.
+async function save(quiet){
+  const env = {};
+  for (const k of ENV) if (k !== 'PRIVATE_KEY') env[k] = $(k).value.trim();
+
+  // The key is the one field a half-finished autosave could destroy: a partial
+  // paste would overwrite a working wallet with garbage. Send it only when we
+  // know it is whole — unchanged since load, derived from a picked seed account,
+  // or confirmed valid by /api/resolve. Omitted, the server keeps what it has.
+  const typed = $('PRIVATE_KEY').value.trim();
   if ($('PRIVATE_KEY').dataset.secret) env.PRIVATE_KEY = $('PRIVATE_KEY').dataset.secret;
+  else if (typed && (typed === loadedKey || keyConfirmed)) env.PRIVATE_KEY = typed;
+  else if (!typed && !loadedKey) env.PRIVATE_KEY = '';
+
   const config = { targets: $('targets').value.split(/[\\s,]+/).filter(Boolean) };
   for (const k of CFG) config[k] = Number($(k).value);
   const fee = +$('feeTotal').value || 0;
@@ -314,13 +369,37 @@ async function save(){
   const d = await (await fetch('/api/save', {method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({env,config})})).json();
   if (d.error) { say('err', d.error); return false; }
+
+  if (quiet) {
+    // Never call load() here — it would overwrite the box being typed in.
+    $('saved').textContent = 'saved';
+    clearTimeout(savedTimer);
+    savedTimer = setTimeout(() => { $('saved').textContent = ''; }, 1400);
+    if (d.warnings.length) say('warn', d.warnings.join(' ')); else say('ok', '');
+    return true;
+  }
   say(d.warnings.length ? 'warn' : 'ok', d.warnings.length ? d.warnings.join(' ') : 'Saved.');
   load(); return true;
 }
 
-$('save').onclick = save;
+// Everything persists as you type. Retyping an API key after every restart was
+// the single most annoying thing about this panel.
+let autoTimer = null, savedTimer = null, keyConfirmed = false, loadedKey = '';
+function autosave(){
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(() => save(true), 700);
+}
+for (const el of document.querySelectorAll('input,textarea')) {
+  el.addEventListener('input', autosave);
+  el.addEventListener('change', autosave);
+}
+
+// No Save button: autosave covers it, and a button you must remember to press
+// is a button that loses your API keys on the next restart.
 let resolveTimer = null;
 $('PRIVATE_KEY').addEventListener('input', () => {
+  keyConfirmed = false;
+  delete $('PRIVATE_KEY').dataset.secret;
   clearTimeout(resolveTimer);
   resolveTimer = setTimeout(resolveWallet, 400);
 });
@@ -336,6 +415,8 @@ async function resolveWallet(){
   if (d.kind === 'invalid') { box.innerHTML = '<div class="msg err">' + d.reason + '</div>'; return; }
   if (d.kind === 'key') {
     box.innerHTML = '<div class="msg ok">Wallet ' + d.accounts[0].address + '</div>';
+    keyConfirmed = true;   // whole and valid — safe for autosave to persist
+    save(true);
     return;
   }
   // A seed phrase is a tree of wallets — show them with balances and let the
@@ -352,7 +433,8 @@ async function resolveWallet(){
       box.querySelectorAll('.acct').forEach(x => x.classList.remove('on'));
       el.classList.add('on');
       $('PRIVATE_KEY').dataset.secret = el.dataset.secret;
-      say('ok', 'Selected. Press Save.');
+      save(true);
+      say('ok', 'Wallet selected and saved.');
     };
   });
 }
@@ -391,6 +473,25 @@ $('startLive').onclick = async () => {
   if (await save()) fetch('/api/start',{method:'POST'});
 };
 $('stop').onclick = () => fetch('/api/stop',{method:'POST'});
+
+$('update').onclick = async () => {
+  $('update').disabled = true;
+  say('ok', 'Updating…');
+  try {
+    const d = await (await fetch('/api/update',{method:'POST'})).json();
+    if (d.error) { say('err', d.error + (d.detail ? ' — ' + d.detail : '')); return; }
+    if (!d.changed) { say('ok', 'Already on the newest build.'); return; }
+    // The panel is restarting under us. Poll until it answers, then reload.
+    say('ok', 'Updated to ' + d.build + ' — restarting…');
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 1000));
+      try { await fetch('/api/state', {cache:'no-store'}); location.reload(); return; } catch {}
+    }
+    say('warn', 'Restart is taking a while — reload the page in a moment.');
+  } finally {
+    $('update').disabled = false;
+  }
+};
 for (const k of ['feeTotal','buySol']) $(k).addEventListener('input', feeNote);
 for (const k of ['holdSeconds','maxConcurrent','dailyStopLossSol']) $(k).addEventListener('input', holdNote);
 
@@ -573,6 +674,10 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === '/api/stop' && req.method === 'POST') {
     return json(res, 200, stopBot());
+  }
+
+  if (url.pathname === '/api/update' && req.method === 'POST') {
+    return json(res, 200, selfUpdate());
   }
 
   if (url.pathname === '/api/logs') {
