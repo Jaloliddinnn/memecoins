@@ -327,6 +327,7 @@ async function exit(built) {
 // ---------------------------------------------------------------------------
 
 let feedFailures = 0;
+let feedGeneration = 0;
 let reconnecting = false;
 
 /**
@@ -454,8 +455,19 @@ async function watchGrpc() {
   });
 
   onConnectionChange(true);
-  feedFailures = 0;
   report('info', `Feed connected — watching ${config.targets.length} wallet(s) at PROCESSED commitment`);
+
+  // A subscription the provider refuses still "connects" — the handshake
+  // succeeds and the rejection arrives a fraction of a second later. Resetting
+  // the backoff here would call that a success and hammer the endpoint every
+  // 2s forever, which is exactly what it did. Only a feed that stays up counts.
+  // Tie the reset to this specific connection: closeFeed() strips listeners, so
+  // a timer from a dead attempt must not clear the counter for a live one.
+  const generation = ++feedGeneration;
+  const settle = setTimeout(() => {
+    if (generation === feedGeneration) feedFailures = 0;
+  }, 30_000);
+  settle.unref?.();
 }
 
 // ---------------------------------------------------------------------------
