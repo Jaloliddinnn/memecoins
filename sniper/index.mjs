@@ -338,8 +338,13 @@ function diagnoseFeedError(err) {
   const text = `${err.message ?? ''} ${err.details ?? ''}`;
 
   if (/unauthorized ip|permission_denied/i.test(text)) {
-    log('  → The feed provider is refusing this machine\'s IP address.');
-    log(`  → Whitelist it: your provider's console, "Allowed IPs".`);
+    log('  → The feed refused this connection. Three things cause this, in the');
+    log('  →  order they are worth checking:');
+    log('  →  1. The subscription expired. Check the console says Active.');
+    log('  →  2. The connection limit is already used. These plans often allow');
+    log('  →     one; another bot, an old process, or a leaked reconnect holds');
+    log('  →     it. Check "Active connections" — it should read 0 when idle.');
+    log('  →  3. The IP is not whitelisted.');
     fetch('https://api.ipify.org', { signal: AbortSignal.timeout(4000) })
       .then((r) => r.text())
       .then((ip) => log(`  → This machine is going out as: ${ip.trim()}`))
@@ -357,14 +362,38 @@ function diagnoseFeedError(err) {
   }
 }
 
+/**
+ * Tear down the previous feed before opening another. Feeds are sold by the
+ * connection — AllenHark's entry plan allows exactly one — so a reconnect that
+ * leaks its predecessor spends the whole allowance on dead sockets and the
+ * provider starts refusing the live one. That refusal arrives as
+ * PERMISSION_DENIED, which reads like a whitelist problem and is not.
+ */
+let feed = { client: null, stream: null };
+
+function closeFeed() {
+  const { client, stream } = feed;
+  feed = { client: null, stream: null };
+  try {
+    stream?.removeAllListeners?.();
+    stream?.end?.();
+    stream?.destroy?.();
+  } catch { /* already gone */ }
+  try {
+    client?.close?.();
+  } catch { /* already gone */ }
+}
+
 async function watchGrpc() {
   const mod = await import('@triton-one/yellowstone-grpc');
   const Client = mod.default?.default ?? mod.default;
   const CommitmentLevel = mod.CommitmentLevel ?? mod.default?.CommitmentLevel;
   const SubscribeRequest = mod.SubscribeRequest ?? mod.default?.SubscribeRequest;
 
+  closeFeed();
   const client = new Client(GRPC_URL, GRPC_TOKEN || undefined, undefined);
   const stream = await client.subscribe();
+  feed = { client, stream };
 
   stream.on('data', (chunk) => {
     if (!chunk?.transaction) return;
@@ -395,6 +424,7 @@ async function watchGrpc() {
     if (feedFailures === 1) diagnoseFeedError(err);
     log(`  retrying in ${(delay / 1000).toFixed(0)}s (attempt ${feedFailures})`);
 
+    closeFeed();
     setTimeout(() => {
       reconnecting = false;
       watchGrpc().catch((e) => log('reconnect failed:', e.message));
