@@ -357,6 +357,16 @@ function diagnoseFeedError(err) {
     log('  →  or leave it blank if the feed authenticates by IP instead.');
     return;
   }
+  // "Upstream unavailable" is the provider's own backend failing behind a proxy
+  // that accepted and authorised us. Sending the user to check their URL there
+  // is wrong — the URL is what got them this far.
+  if (/upstream/i.test(text)) {
+    log('  → Your settings are fine: the feed accepted and authorised this');
+    log('  →  connection, then could not reach the Solana node behind it.');
+    log('  →  That is the provider\'s backend, not anything you can configure.');
+    log('  →  Wait it out, ask their support, or try their other region.');
+    return;
+  }
   if (/unavailable|econnrefused|enotfound|dns/i.test(text)) {
     log('  → Cannot reach the feed at all. Check the Feed URL host and port,');
     log('  →  and that it starts with http:// (plain) or https:// (TLS).');
