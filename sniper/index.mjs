@@ -391,7 +391,11 @@ function closeFeed() {
     stream?.destroy?.();
   } catch { /* already gone */ }
   try {
+    // The wrapper exposes no close(); the closable gRPC channel is the
+    // ServiceClientImpl it holds. Without this the socket stays open and the
+    // provider keeps counting it against a one-connection plan.
     client?.close?.();
+    client?._client?.close?.();
   } catch { /* already gone */ }
 }
 
