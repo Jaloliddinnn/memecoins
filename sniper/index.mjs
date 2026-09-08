@@ -326,6 +326,37 @@ async function exit(built) {
 // Feed
 // ---------------------------------------------------------------------------
 
+let feedFailures = 0;
+let reconnecting = false;
+
+/**
+ * gRPC status codes are not advice. Turn the three that actually happen into
+ * the thing to go and do, and for an IP block fetch the address the provider
+ * is really seeing — it is never the one you remember whitelisting.
+ */
+function diagnoseFeedError(err) {
+  const text = `${err.message ?? ''} ${err.details ?? ''}`;
+
+  if (/unauthorized ip|permission_denied/i.test(text)) {
+    log('  → The feed provider is refusing this machine\'s IP address.');
+    log(`  → Whitelist it: your provider's console, "Allowed IPs".`);
+    fetch('https://api.ipify.org', { signal: AbortSignal.timeout(4000) })
+      .then((r) => r.text())
+      .then((ip) => log(`  → This machine is going out as: ${ip.trim()}`))
+      .catch(() => log('  → Could not read your public IP; run: curl ifconfig.me'));
+    return;
+  }
+  if (/unauthenticated|invalid token|401/i.test(text)) {
+    log('  → The feed rejected the token. Check "Feed token" under Advanced,');
+    log('  →  or leave it blank if the feed authenticates by IP instead.');
+    return;
+  }
+  if (/unavailable|econnrefused|enotfound|dns/i.test(text)) {
+    log('  → Cannot reach the feed at all. Check the Feed URL host and port,');
+    log('  →  and that it starts with http:// (plain) or https:// (TLS).');
+  }
+}
+
 async function watchGrpc() {
   const mod = await import('@triton-one/yellowstone-grpc');
   const Client = mod.default?.default ?? mod.default;
@@ -352,8 +383,22 @@ async function watchGrpc() {
 
   stream.on('error', (err) => {
     onConnectionChange(false);
-    report('error', `Feed dropped: ${err.message} — reconnecting`);
-    setTimeout(() => watchGrpc().catch((e) => log('reconnect failed:', e.message)), 2000);
+    // A stream can emit 'error' more than once on the way down, and each one
+    // used to start its own reconnect chain — the loops multiply and bury the
+    // log. One reconnect in flight at a time.
+    if (reconnecting) return;
+    reconnecting = true;
+
+    const delay = Math.min(2000 * 2 ** feedFailures, 30_000);
+    feedFailures++;
+    report('error', `Feed dropped: ${err.message}`);
+    if (feedFailures === 1) diagnoseFeedError(err);
+    log(`  retrying in ${(delay / 1000).toFixed(0)}s (attempt ${feedFailures})`);
+
+    setTimeout(() => {
+      reconnecting = false;
+      watchGrpc().catch((e) => log('reconnect failed:', e.message));
+    }, delay);
   });
 
   await new Promise((resolve, reject) => {
@@ -379,6 +424,7 @@ async function watchGrpc() {
   });
 
   onConnectionChange(true);
+  feedFailures = 0;
   report('info', `Feed connected — watching ${config.targets.length} wallet(s) at PROCESSED commitment`);
 }
 
